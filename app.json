@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Discogs Vinyl Sorter",
+    "slug": "discogs-vinyl-sorter-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1a1a2e"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.discogvinylsorter.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1a1a2e",
+        "foregroundImage": "./assets/adaptive-icon.png"
+      },
+      "package": "com.discogvinylsorter.app"
+    },
+    "scheme": "discogvinylsorter"
+  }
+}
