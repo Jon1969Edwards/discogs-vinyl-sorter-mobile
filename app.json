@@ -27,6 +27,12 @@
       "expo-asset",
       "expo-font",
       "./plugins/withAndroidDiscogsQueries.js"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "1658702c-58c0-4395-9cc2-a6cdc508df29"
+      }
+    },
+    "owner": "jonathan-charles-edwards"
   }
 }
