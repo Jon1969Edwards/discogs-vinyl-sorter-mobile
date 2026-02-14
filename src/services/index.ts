@@ -22,3 +22,5 @@ export {
   exportAndShare,
   type ExportFormat,
 } from './exportShare';
+
+export { loadSettings, saveSettings } from './settings';

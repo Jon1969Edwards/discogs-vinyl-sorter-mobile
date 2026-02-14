@@ -2,12 +2,13 @@
  * Collection screen – list of sorted LPs with thumbnails.
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
+  SectionList,
   Image,
   TextInput,
   TouchableOpacity,
@@ -16,6 +17,9 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { ReleaseRow } from '../types';
 import { useCollection } from '../hooks/useCollection';
+import { useSettingsContext } from '../contexts/SettingsContext';
+import { sortRows, getSectionLetter } from '../utils';
+import { DEFAULT_SETTINGS } from '../types/settings';
 import {
   getStoredToken,
   clearStoredToken,
@@ -26,6 +30,7 @@ import {
 export type RootStackParamList = {
   Collection: undefined;
   AlbumDetail: { release: ReleaseRow };
+  Settings: undefined;
 };
 
 type CollectionScreenProps = NativeStackScreenProps<RootStackParamList, 'Collection'> & {
@@ -64,11 +69,14 @@ function AlbumRow({
 }
 
 export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProps) {
+  const { settings } = useSettingsContext();
   const { state, fetchCollection, reset } = useCollection();
   const [token, setToken] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+
+  const effectiveSettings = settings ?? DEFAULT_SETTINGS;
 
   useEffect(() => {
     getStoredToken().then(setToken);
@@ -76,9 +84,27 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
 
   useEffect(() => {
     if (token && state.status === 'idle') {
-      fetchCollection(token);
+      fetchCollection(token, { lpStrict: effectiveSettings.lpStrict });
     }
-  }, [token, state.status, fetchCollection]);
+  }, [token, state.status, fetchCollection, effectiveSettings.lpStrict]);
+
+  const prevLpStrict = useRef<boolean | null>(null);
+  const hasFetched = useRef(false);
+  useEffect(() => {
+    if (state.status === 'success') hasFetched.current = true;
+  }, [state.status]);
+  useEffect(() => {
+    if (
+      hasFetched.current &&
+      prevLpStrict.current !== null &&
+      prevLpStrict.current !== effectiveSettings.lpStrict &&
+      token
+    ) {
+      prevLpStrict.current = effectiveSettings.lpStrict;
+      reset();
+    }
+    prevLpStrict.current = effectiveSettings.lpStrict;
+  }, [effectiveSettings.lpStrict, token, reset]);
 
   const handleSignOut = useCallback(async () => {
     await clearStoredToken();
@@ -102,9 +128,18 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
     [state]
   );
 
+  const sortedRows = useMemo(() => {
+    if (state.status !== 'success') return [];
+    return sortRows(
+      state.rows,
+      effectiveSettings.variousPolicy,
+      effectiveSettings.sortBy
+    );
+  }, [state.status, state.rows, effectiveSettings.variousPolicy, effectiveSettings.sortBy]);
+
   const filteredRows =
     state.status === 'success' && search.trim()
-      ? state.rows.filter((r) => {
+      ? sortedRows.filter((r) => {
           const q = search.toLowerCase();
           return (
             r.artist_display.toLowerCase().includes(q) ||
@@ -112,8 +147,29 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
           );
         })
       : state.status === 'success'
-        ? state.rows
+        ? sortedRows
         : [];
+
+  const sections = useMemo(() => {
+    if (!effectiveSettings.showDividers || filteredRows.length === 0) return [];
+    const map = new Map<string, ReleaseRow[]>();
+    for (const row of filteredRows) {
+      const letter = getSectionLetter(row, effectiveSettings.sortBy);
+      const list = map.get(letter) ?? [];
+      list.push(row);
+      map.set(letter, list);
+    }
+    const keys = [...map.keys()].sort((a, b) => {
+      if (a === '#') return 1;
+      if (b === '#') return -1;
+      if (a === '?') return 1;
+      if (b === '?') return -1;
+      if (/^\d+$/.test(a) && /^\d+$/.test(b))
+        return parseInt(a, 10) - parseInt(b, 10);
+      return a.localeCompare(b);
+    });
+    return keys.map((title) => ({ title, data: map.get(title) ?? [] }));
+  }, [filteredRows, effectiveSettings.showDividers, effectiveSettings.sortBy]);
 
   if (state.status === 'loading') {
     return (
@@ -158,6 +214,12 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
           {state.username}'s LPs ({state.rows.length})
         </Text>
         <View style={styles.headerActions}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Settings')}
+            style={styles.refreshBtn}
+          >
+            <Text style={styles.refreshText}>Settings</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             onPress={() => token && reset()}
             style={styles.refreshBtn}
@@ -206,21 +268,45 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
         <Text style={styles.exportError}>{exportError}</Text>
       ) : null}
 
-      <FlatList
-        data={filteredRows}
-        keyExtractor={(_, index) => `lp-${index}`}
-        renderItem={({ item }) => (
-          <AlbumRow
-            item={item}
-            onPress={() => navigation.navigate('AlbumDetail', { release: item })}
-          />
-        )}
-        ListEmptyComponent={
-          <Text style={styles.empty}>
-            {search ? 'No matches' : 'No LPs in collection'}
-          </Text>
-        }
-      />
+      {effectiveSettings.showDividers && sections.length > 0 ? (
+        <SectionList
+          sections={sections}
+          keyExtractor={(_, index) => `lp-${index}`}
+          renderItem={({ item }) => (
+            <AlbumRow
+              item={item}
+              onPress={() => navigation.navigate('AlbumDetail', { release: item })}
+            />
+          )}
+          renderSectionHeader={({ section }) => (
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionHeaderText}>{section.title}</Text>
+            </View>
+          )}
+          stickySectionHeadersEnabled
+          ListEmptyComponent={
+            <Text style={styles.empty}>
+              {search ? 'No matches' : 'No LPs in collection'}
+            </Text>
+          }
+        />
+      ) : (
+        <FlatList
+          data={filteredRows}
+          keyExtractor={(_, index) => `lp-${index}`}
+          renderItem={({ item }) => (
+            <AlbumRow
+              item={item}
+              onPress={() => navigation.navigate('AlbumDetail', { release: item })}
+            />
+          )}
+          ListEmptyComponent={
+            <Text style={styles.empty}>
+              {search ? 'No matches' : 'No LPs in collection'}
+            </Text>
+          }
+        />
+      )}
     </View>
   );
 }
@@ -363,5 +449,15 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     padding: 24,
+  },
+  sectionHeader: {
+    backgroundColor: '#252542',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  sectionHeaderText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#e94560',
   },
 });

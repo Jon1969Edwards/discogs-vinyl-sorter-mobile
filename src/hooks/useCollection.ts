@@ -1,5 +1,6 @@
 /**
  * Hook to fetch and process Discogs LP collection.
+ * Returns raw (unsorted) rows; caller applies sort based on settings.
  */
 
 import { useState, useCallback } from 'react';
@@ -10,7 +11,7 @@ import {
   iterateCollection,
   type DiscogsCollectionRelease,
 } from '../services';
-import { buildReleaseRow, isLp33, sortRows } from '../utils';
+import { buildReleaseRow, isLp33 } from '../utils';
 
 export type CollectionState =
   | { status: 'idle' }
@@ -18,50 +19,56 @@ export type CollectionState =
   | { status: 'error'; error: string }
   | { status: 'success'; rows: ReleaseRow[]; username: string };
 
+export type FetchOptions = {
+  lpStrict?: boolean;
+};
+
 export function useCollection() {
   const [state, setState] = useState<CollectionState>({ status: 'idle' });
 
-  const fetchCollection = useCallback(async (token: string) => {
-    setState({ status: 'loading', message: 'Connecting to Discogs…' });
+  const fetchCollection = useCallback(
+    async (token: string, options: FetchOptions = {}) => {
+      const { lpStrict = false } = options;
+      setState({ status: 'loading', message: 'Connecting to Discogs…' });
 
-    try {
-      const client = createDiscogsClient(token);
-      const identity = await getIdentity(client);
-      setState({
-        status: 'loading',
-        message: `Fetching ${identity.username}'s collection…`,
-      });
+      try {
+        const client = createDiscogsClient(token);
+        const identity = await getIdentity(client);
+        setState({
+          status: 'loading',
+          message: `Fetching ${identity.username}'s collection…`,
+        });
 
-      const rows: ReleaseRow[] = [];
-      let count = 0;
+        const rows: ReleaseRow[] = [];
+        let count = 0;
 
-      for await (const item of iterateCollection(client, identity.username)) {
-        const basic = (item as DiscogsCollectionRelease).basic_information;
-        if (!basic || !isLp33(basic)) continue;
+        for await (const item of iterateCollection(client, identity.username)) {
+          const basic = (item as DiscogsCollectionRelease).basic_information;
+          if (!basic || !isLp33(basic, lpStrict)) continue;
 
-        rows.push(buildReleaseRow(item as DiscogsCollectionRelease));
-        count += 1;
-        if (count % 50 === 0) {
-          setState({
-            status: 'loading',
-            message: `Loaded ${count} LPs…`,
-          });
+          rows.push(buildReleaseRow(item as DiscogsCollectionRelease));
+          count += 1;
+          if (count % 50 === 0) {
+            setState({
+              status: 'loading',
+              message: `Loaded ${count} LPs…`,
+            });
+          }
         }
+
+        setState({
+          status: 'success',
+          rows,
+          username: identity.username,
+        });
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : 'Failed to fetch collection';
+        setState({ status: 'error', error: message });
       }
-
-      const sorted = sortRows(rows, 'last', 'artist');
-
-      setState({
-        status: 'success',
-        rows: sorted,
-        username: identity.username,
-      });
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to fetch collection';
-      setState({ status: 'error', error: message });
-    }
-  }, []);
+    },
+    []
+  );
 
   const reset = useCallback(() => {
     setState({ status: 'idle' });

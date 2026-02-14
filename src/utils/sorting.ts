@@ -200,6 +200,19 @@ export function isVariousArtist(artistDisplay: string): boolean {
 export type VariousPolicy = 'normal' | 'last' | 'title';
 export type SortBy = 'artist' | 'title' | 'year' | 'price_asc' | 'price_desc';
 
+export function getSectionLetter(row: ReleaseRow, sortBy: SortBy): string {
+  if (sortBy === 'artist' || sortBy === 'title') {
+    const str = sortBy === 'artist' ? row.sort_artist : row.sort_title;
+    const first = (str || '').charAt(0).toUpperCase();
+    return /[A-Z0-9]/.test(first) ? first : '#';
+  }
+  if (sortBy === 'year') {
+    const y = row.year;
+    return y != null ? String(y) : '?';
+  }
+  return '';
+}
+
 export function sortRows(
   rows: ReleaseRow[],
   variousPolicy: VariousPolicy = 'normal',

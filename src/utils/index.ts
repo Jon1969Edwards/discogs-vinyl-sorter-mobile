@@ -5,6 +5,7 @@ export {
   buildReleaseRow,
   isVariousArtist,
   sortRows,
+  getSectionLetter,
   type VariousPolicy,
   type SortBy,
 } from './sorting';
