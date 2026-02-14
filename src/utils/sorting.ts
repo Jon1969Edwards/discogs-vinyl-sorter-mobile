@@ -176,6 +176,7 @@ export function buildReleaseRow(
     notes: item.notes || '',
     release_id: relId ?? null,
     master_id: (basic as { master_id?: number }).master_id ?? null,
+    instance_id: item.instance_id ?? null,
     sort_artist: sortArtist,
     sort_title: sortTitle,
     thumb_url: thumbUrl,

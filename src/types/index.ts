@@ -14,6 +14,7 @@ export interface ReleaseRow {
   notes: string;
   release_id?: number | null;
   master_id?: number | null;
+  instance_id?: number | null;
   sort_artist: string;
   sort_title: string;
   median_price?: number | null;
