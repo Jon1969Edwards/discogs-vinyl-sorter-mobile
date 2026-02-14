@@ -12,8 +12,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { setStoredToken, getStoredToken } from '../services';
+
+const DISCOGS_TOKEN_URL = 'https://www.discogs.com/settings/developers';
 
 interface AuthScreenProps {
   onAuthenticated: () => void;
@@ -54,6 +58,22 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     }
   }, [token, onAuthenticated]);
 
+  const handlePaste = useCallback(async () => {
+    try {
+      const text = await Clipboard.getStringAsync();
+      if (text?.trim()) {
+        setToken(text.trim());
+        setError(null);
+      }
+    } catch {
+      setError('Could not paste from clipboard');
+    }
+  }, []);
+
+  const handleOpenDiscogs = useCallback(() => {
+    Linking.openURL(DISCOGS_TOKEN_URL);
+  }, []);
+
   if (checkingStored) {
     return (
       <View style={styles.center}>
@@ -73,23 +93,41 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
           Enter your Discogs Personal Access Token to load your collection.
         </Text>
         <Text style={styles.hint}>
-          Get a token at: Discogs → Settings → Developers → Personal Access Tokens
+          You need a computer to create a token. Then paste it here or use the
+          same token on both devices.
         </Text>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Paste your token here"
-          placeholderTextColor="#666"
-          value={token}
-          onChangeText={(v) => {
-            setToken(v);
-            setError(null);
-          }}
-          secureTextEntry
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!loading}
-        />
+        <TouchableOpacity
+          style={styles.linkButton}
+          onPress={handleOpenDiscogs}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.linkText}>Open Discogs to get token</Text>
+        </TouchableOpacity>
+
+        <View style={styles.inputRow}>
+          <TextInput
+            style={[styles.input, styles.inputFlex]}
+            placeholder="Paste your token here"
+            placeholderTextColor="#666"
+            value={token}
+            onChangeText={(v) => {
+              setToken(v);
+              setError(null);
+            }}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!loading}
+          />
+          <TouchableOpacity
+            style={styles.pasteButton}
+            onPress={handlePaste}
+            disabled={loading}
+          >
+            <Text style={styles.pasteButtonText}>Paste</Text>
+          </TouchableOpacity>
+        </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -138,7 +176,23 @@ const styles = StyleSheet.create({
   hint: {
     fontSize: 13,
     color: '#666',
-    marginBottom: 24,
+    marginBottom: 16,
+  },
+  linkButton: {
+    marginBottom: 20,
+    padding: 12,
+    backgroundColor: '#252542',
+    borderRadius: 8,
+  },
+  linkText: {
+    color: '#e94560',
+    fontSize: 15,
+    textAlign: 'center',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
   },
   input: {
     backgroundColor: '#252542',
@@ -146,7 +200,20 @@ const styles = StyleSheet.create({
     padding: 16,
     fontSize: 16,
     color: '#fff',
-    marginBottom: 16,
+  },
+  inputFlex: {
+    flex: 1,
+  },
+  pasteButton: {
+    backgroundColor: '#252542',
+    borderRadius: 8,
+    paddingHorizontal: 20,
+    justifyContent: 'center',
+  },
+  pasteButtonText: {
+    color: '#e94560',
+    fontSize: 15,
+    fontWeight: '600',
   },
   error: {
     color: '#e94560',
