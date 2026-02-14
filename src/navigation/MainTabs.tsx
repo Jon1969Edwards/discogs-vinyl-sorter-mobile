@@ -4,6 +4,7 @@
 
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CollectionScreen } from '../screens/CollectionScreen';
 import { WishlistScreen } from '../screens/WishlistScreen';
 
@@ -18,6 +19,7 @@ type MainTabsProps = {
 
 export function MainTabs({ navigation, onSignOut }: MainTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>('collection');
+  const insets = useSafeAreaInsets();
 
   return (
     <View style={styles.container}>
@@ -27,7 +29,7 @@ export function MainTabs({ navigation, onSignOut }: MainTabsProps) {
       <View style={[styles.content, activeTab !== 'wishlist' && styles.hidden]}>
         <WishlistScreen navigation={navigation} onSignOut={onSignOut} />
       </View>
-      <View style={styles.tabBar}>
+      <View style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'collection' && styles.tabActive]}
           onPress={() => setActiveTab('collection')}
@@ -83,7 +85,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a2e',
     borderTopWidth: 1,
     borderTopColor: '#252542',
-    paddingBottom: 8,
   },
   tab: {
     flex: 1,
