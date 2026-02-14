@@ -1,5 +1,5 @@
 /**
- * Collection screen – list of sorted LPs with thumbnails.
+ * Wishlist screen – Discogs folder 1, all formats.
  */
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
@@ -16,7 +16,7 @@ import {
   Platform,
 } from 'react-native';
 import type { ReleaseRow } from '../types';
-import { useCollection } from '../hooks/useCollection';
+import { useWishlist } from '../hooks/useWishlist';
 import { useSettingsContext } from '../contexts/SettingsContext';
 import { sortRows, getSectionLetter } from '../utils';
 import { DEFAULT_SETTINGS } from '../types/settings';
@@ -27,13 +27,7 @@ import {
   type ExportFormat,
 } from '../services';
 
-export type RootStackParamList = {
-  MainTabs: undefined;
-  AlbumDetail: { release: ReleaseRow };
-  Settings: undefined;
-};
-
-type CollectionScreenProps = {
+type WishlistScreenProps = {
   navigation: {
     navigate: (name: 'AlbumDetail' | 'Settings', params?: { release: ReleaseRow }) => void;
   };
@@ -71,9 +65,12 @@ function AlbumRow({
   );
 }
 
-export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProps) {
+export function WishlistScreen({
+  navigation,
+  onSignOut,
+}: WishlistScreenProps) {
   const { settings } = useSettingsContext();
-  const { state, fetchCollection, reset } = useCollection();
+  const { state, fetchWishlist, reset } = useWishlist();
   const [token, setToken] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [exporting, setExporting] = useState(false);
@@ -87,27 +84,9 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
 
   useEffect(() => {
     if (token && state.status === 'idle') {
-      fetchCollection(token, { lpStrict: effectiveSettings.lpStrict });
+      fetchWishlist(token);
     }
-  }, [token, state.status, fetchCollection, effectiveSettings.lpStrict]);
-
-  const prevLpStrict = useRef<boolean | null>(null);
-  const hasFetched = useRef(false);
-  useEffect(() => {
-    if (state.status === 'success') hasFetched.current = true;
-  }, [state.status]);
-  useEffect(() => {
-    if (
-      hasFetched.current &&
-      prevLpStrict.current !== null &&
-      prevLpStrict.current !== effectiveSettings.lpStrict &&
-      token
-    ) {
-      prevLpStrict.current = effectiveSettings.lpStrict;
-      reset();
-    }
-    prevLpStrict.current = effectiveSettings.lpStrict;
-  }, [effectiveSettings.lpStrict, token, reset]);
+  }, [token, state.status, fetchWishlist]);
 
   const handleSignOut = useCallback(async () => {
     await clearStoredToken();
@@ -179,7 +158,7 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#e94560" />
         <Text style={styles.loadingText}>
-          {state.message || 'Loading collection…'}
+          {state.message || 'Loading wishlist…'}
         </Text>
       </View>
     );
@@ -214,7 +193,7 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>
-          {state.username}'s LPs ({state.rows.length})
+          {state.username}'s Wishlist ({state.rows.length})
         </Text>
         <View style={styles.headerActions}>
           <TouchableOpacity
@@ -274,7 +253,7 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
       {effectiveSettings.showDividers && sections.length > 0 && Platform.OS !== 'web' ? (
         <SectionList
           sections={sections}
-          keyExtractor={(_, index) => `lp-${index}`}
+          keyExtractor={(_, index) => `wl-${index}`}
           renderItem={({ item }) => (
             <AlbumRow
               item={item}
@@ -289,14 +268,14 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
           stickySectionHeadersEnabled
           ListEmptyComponent={
             <Text style={styles.empty}>
-              {search ? 'No matches' : 'No LPs in collection'}
+              {search ? 'No matches' : 'No items in wishlist'}
             </Text>
           }
         />
       ) : (
         <FlatList
           data={filteredRows}
-          keyExtractor={(_, index) => `lp-${index}`}
+          keyExtractor={(_, index) => `wl-${index}`}
           renderItem={({ item }) => (
             <AlbumRow
               item={item}
@@ -305,7 +284,7 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
           )}
           ListEmptyComponent={
             <Text style={styles.empty}>
-              {search ? 'No matches' : 'No LPs in collection'}
+              {search ? 'No matches' : 'No items in wishlist'}
             </Text>
           }
         />

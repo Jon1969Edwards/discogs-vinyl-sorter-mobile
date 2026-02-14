@@ -10,9 +10,9 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthScreen } from './src/screens/AuthScreen';
-import { CollectionScreen } from './src/screens/CollectionScreen';
 import { AlbumDetailScreen } from './src/screens/AlbumDetailScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import { MainTabs } from './src/navigation/MainTabs';
 import { SettingsProvider } from './src/contexts/SettingsContext';
 import { getStoredToken } from './src/services';
 
@@ -60,13 +60,8 @@ export default function App() {
               </Stack.Screen>
             ) : (
               <>
-                <Stack.Screen name="Collection">
-                  {(props) => (
-                    <CollectionScreen
-                      {...props}
-                      onSignOut={handleSignOut}
-                    />
-                  )}
+                <Stack.Screen name="MainTabs">
+                  {() => <MainTabs onSignOut={handleSignOut} />}
                 </Stack.Screen>
                 <Stack.Screen
                   name="AlbumDetail"
