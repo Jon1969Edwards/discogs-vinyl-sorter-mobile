@@ -61,7 +61,12 @@ export default function App() {
             ) : (
               <>
                 <Stack.Screen name="MainTabs">
-                  {() => <MainTabs onSignOut={handleSignOut} />}
+                  {(props) => (
+                    <MainTabs
+                      {...props}
+                      onSignOut={handleSignOut}
+                    />
+                  )}
                 </Stack.Screen>
                 <Stack.Screen
                   name="AlbumDetail"
