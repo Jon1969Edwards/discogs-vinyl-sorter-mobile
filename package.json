@@ -15,7 +15,7 @@
     "expo": "~54.0.0",
     "expo-asset": "~12.0.12",
     "expo-clipboard": "~8.0.0",
-    "expo-file-system": "~18.0.0",
+    "expo-file-system": "~19.0.21",
     "expo-constants": "~18.0.13",
     "expo-font": "~14.0.11",
     "expo-secure-store": "~15.0.0",
@@ -29,7 +29,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
-    "babel-preset-expo": "~12.0.0",
+    "babel-preset-expo": "~54.0.10",
     "@types/react": "~19.1.0",
     "react-native-dotenv": "^3.4.0",
     "typescript": "~5.9.2"
