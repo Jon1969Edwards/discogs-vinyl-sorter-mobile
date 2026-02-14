@@ -4,10 +4,14 @@ export {
   getIdentity,
   fetchCollectionPage,
   iterateCollection,
+  fetchWantlistPage,
+  iterateWantlist,
   fetchMarketplaceStats,
   type DiscogsIdentity,
   type DiscogsCollectionRelease,
   type DiscogsCollectionResponse,
+  type DiscogsWant,
+  type DiscogsWantlistResponse,
   type DiscogsMarketplaceStats,
 } from './discogsApi';
 

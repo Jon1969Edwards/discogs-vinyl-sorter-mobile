@@ -53,6 +53,21 @@ export interface DiscogsCollectionResponse {
   releases: DiscogsCollectionRelease[];
 }
 
+/** Wantlist item – items you want to buy (different from collection folders). */
+export interface DiscogsWant {
+  id: number;
+  resource_url: string;
+  date_added: string;
+  rating?: number;
+  basic_information: DiscogsCollectionRelease['basic_information'];
+  notes?: string;
+}
+
+export interface DiscogsWantlistResponse {
+  pagination: DiscogsPagination;
+  wants: DiscogsWant[];
+}
+
 export interface DiscogsMarketplaceStats {
   lowest_price?: { value: number; currency: string };
   num_for_sale: number;
@@ -207,6 +222,52 @@ export async function* iterateCollection(
     }
 
     for (const item of data.releases ?? []) {
+      yield item;
+    }
+
+    page += 1;
+    if (maxPages !== undefined && page > maxPages) break;
+    if (totalPages !== null && page > totalPages) break;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Wantlist API (items you want to buy – different from collection folders)
+// ---------------------------------------------------------------------------
+
+export async function fetchWantlistPage(
+  client: AxiosInstance,
+  username: string,
+  page: number,
+  perPage: number
+): Promise<DiscogsWantlistResponse> {
+  return apiGet<DiscogsWantlistResponse>(
+    client,
+    `/users/${username}/wants`,
+    {
+      page: String(page),
+      per_page: String(perPage),
+    }
+  );
+}
+
+export async function* iterateWantlist(
+  client: AxiosInstance,
+  username: string,
+  perPage = 100,
+  maxPages?: number
+): AsyncGenerator<DiscogsWant> {
+  let page = 1;
+  let totalPages: number | null = null;
+
+  while (true) {
+    const data = await fetchWantlistPage(client, username, page, perPage);
+
+    if (totalPages === null) {
+      totalPages = data.pagination.pages ?? 1;
+    }
+
+    for (const item of data.wants ?? []) {
       yield item;
     }
 
