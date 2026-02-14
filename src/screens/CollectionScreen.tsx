@@ -12,8 +12,8 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Linking,
 } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { ReleaseRow } from '../types';
 import { useCollection } from '../hooks/useCollection';
 import {
@@ -23,9 +23,14 @@ import {
   type ExportFormat,
 } from '../services';
 
-interface CollectionScreenProps {
+export type RootStackParamList = {
+  Collection: undefined;
+  AlbumDetail: { release: ReleaseRow };
+};
+
+type CollectionScreenProps = NativeStackScreenProps<RootStackParamList, 'Collection'> & {
   onSignOut: () => void;
-}
+};
 
 function AlbumRow({
   item,
@@ -58,7 +63,7 @@ function AlbumRow({
   );
 }
 
-export function CollectionScreen({ onSignOut }: CollectionScreenProps) {
+export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProps) {
   const { state, fetchCollection, reset } = useCollection();
   const [token, setToken] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -209,7 +214,7 @@ export function CollectionScreen({ onSignOut }: CollectionScreenProps) {
         renderItem={({ item }) => (
           <AlbumRow
             item={item}
-            onPress={() => item.discogs_url && Linking.openURL(item.discogs_url)}
+            onPress={() => navigation.navigate('AlbumDetail', { release: item })}
           />
         )}
         ListEmptyComponent={

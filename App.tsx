@@ -11,6 +11,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthScreen } from './src/screens/AuthScreen';
 import { CollectionScreen } from './src/screens/CollectionScreen';
+import { AlbumDetailScreen } from './src/screens/AlbumDetailScreen';
 import { getStoredToken } from './src/services';
 
 const Stack = createNativeStackNavigator();
@@ -55,14 +56,20 @@ export default function App() {
               )}
             </Stack.Screen>
           ) : (
-            <Stack.Screen name="Collection">
-              {(props) => (
-                <CollectionScreen
-                  {...props}
-                  onSignOut={handleSignOut}
-                />
-              )}
-            </Stack.Screen>
+            <>
+              <Stack.Screen name="Collection">
+                {(props) => (
+                  <CollectionScreen
+                    {...props}
+                    onSignOut={handleSignOut}
+                  />
+                )}
+              </Stack.Screen>
+              <Stack.Screen
+                name="AlbumDetail"
+                component={AlbumDetailScreen}
+              />
+            </>
           )}
         </Stack.Navigator>
       </NavigationContainer>
