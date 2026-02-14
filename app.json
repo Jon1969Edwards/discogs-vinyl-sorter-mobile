@@ -25,7 +25,8 @@
     "scheme": "discogvinylsorter",
     "plugins": [
       "expo-asset",
-      "expo-font"
+      "expo-font",
+      "./plugins/withAndroidDiscogsQueries.js"
     ]
   }
 }
