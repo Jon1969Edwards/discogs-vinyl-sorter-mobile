@@ -13,6 +13,7 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { ReleaseRow } from '../types';
@@ -58,11 +59,11 @@ function AlbumRow({
         <Text style={styles.title} numberOfLines={1}>
           {item.title}
         </Text>
-        {(item.year || item.country) && (
+        {(item.year != null || item.country) ? (
           <Text style={styles.meta} numberOfLines={1}>
-            {[item.year, item.country].filter(Boolean).join(' • ')}
+            {[item.year, item.country].filter((v) => v != null && v !== '').join(' • ')}
           </Text>
-        )}
+        ) : null}
       </View>
     </TouchableOpacity>
   );
@@ -268,7 +269,7 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
         <Text style={styles.exportError}>{exportError}</Text>
       ) : null}
 
-      {effectiveSettings.showDividers && sections.length > 0 ? (
+      {effectiveSettings.showDividers && sections.length > 0 && Platform.OS !== 'web' ? (
         <SectionList
           sections={sections}
           keyExtractor={(_, index) => `lp-${index}`}

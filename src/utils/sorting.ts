@@ -210,7 +210,7 @@ export function getSectionLetter(row: ReleaseRow, sortBy: SortBy): string {
     const y = row.year;
     return y != null ? String(y) : '?';
   }
-  return '';
+  return '—';
 }
 
 export function sortRows(
