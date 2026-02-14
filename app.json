@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Discogs Vinyl Sorter",
-    "slug": "discogs-vinyl-sorter-mobile",
+    "slug": "discogs-vinyl-sorter",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
