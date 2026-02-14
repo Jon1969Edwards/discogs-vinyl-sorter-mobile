@@ -40,45 +40,47 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <StatusBar style="light" />
-        <Stack.Navigator
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: '#1a1a2e' },
-          }}
-        >
-          {!hasToken ? (
-            <Stack.Screen name="Auth">
-              {(props) => (
-                <AuthScreen
-                  {...props}
-                  onAuthenticated={handleAuthenticated}
-                />
-              )}
-            </Stack.Screen>
-          ) : (
-            <SettingsProvider>
-              <Stack.Screen name="Collection">
+      <SettingsProvider>
+        <NavigationContainer>
+          <StatusBar style="light" />
+          <Stack.Navigator
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: '#1a1a2e' },
+            }}
+          >
+            {!hasToken ? (
+              <Stack.Screen name="Auth">
                 {(props) => (
-                  <CollectionScreen
+                  <AuthScreen
                     {...props}
-                    onSignOut={handleSignOut}
+                    onAuthenticated={handleAuthenticated}
                   />
                 )}
               </Stack.Screen>
-              <Stack.Screen
-                name="AlbumDetail"
-                component={AlbumDetailScreen}
-              />
-              <Stack.Screen
-                name="Settings"
-                component={SettingsScreen}
-              />
-            </SettingsProvider>
-          )}
-        </Stack.Navigator>
-      </NavigationContainer>
+            ) : (
+              <>
+                <Stack.Screen name="Collection">
+                  {(props) => (
+                    <CollectionScreen
+                      {...props}
+                      onSignOut={handleSignOut}
+                    />
+                  )}
+                </Stack.Screen>
+                <Stack.Screen
+                  name="AlbumDetail"
+                  component={AlbumDetailScreen}
+                />
+                <Stack.Screen
+                  name="Settings"
+                  component={SettingsScreen}
+                />
+              </>
+            )}
+          </Stack.Navigator>
+        </NavigationContainer>
+      </SettingsProvider>
     </SafeAreaProvider>
   );
 }
