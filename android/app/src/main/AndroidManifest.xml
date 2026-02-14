@@ -27,6 +27,7 @@
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="discogvinylsorter"/>
+        <data android:scheme="exp+discogs-vinyl-sorter"/>
       </intent-filter>
     </activity>
   </application>
