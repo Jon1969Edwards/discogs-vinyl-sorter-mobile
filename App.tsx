@@ -1,31 +1,80 @@
+/**
+ * Discogs Vinyl Sorter – Mobile
+ */
+
+import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+import { AuthScreen } from './src/screens/AuthScreen';
+import { CollectionScreen } from './src/screens/CollectionScreen';
+import { getStoredToken } from './src/services';
+
+const Stack = createNativeStackNavigator();
 
 export default function App() {
+  const [hasToken, setHasToken] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    getStoredToken().then((token) => {
+      setHasToken(token !== null && token.length > 0);
+    });
+  }, []);
+
+  const handleAuthenticated = () => setHasToken(true);
+  const handleSignOut = () => setHasToken(false);
+
+  if (hasToken === null) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color="#e94560" />
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Discogs Vinyl Sorter</Text>
-      <Text style={styles.subtitle}>Connect your Discogs collection</Text>
-      <StatusBar style="auto" />
-    </View>
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <StatusBar style="light" />
+        <Stack.Navigator
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: '#1a1a2e' },
+          }}
+        >
+          {!hasToken ? (
+            <Stack.Screen name="Auth">
+              {(props) => (
+                <AuthScreen
+                  {...props}
+                  onAuthenticated={handleAuthenticated}
+                />
+              )}
+            </Stack.Screen>
+          ) : (
+            <Stack.Screen name="Collection">
+              {(props) => (
+                <CollectionScreen
+                  {...props}
+                  onSignOut={handleSignOut}
+                />
+              )}
+            </Stack.Screen>
+          )}
+        </Stack.Navigator>
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  loading: {
     flex: 1,
     backgroundColor: '#1a1a2e',
-    alignItems: 'center',
     justifyContent: 'center',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#eee',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#aaa',
-    marginTop: 8,
+    alignItems: 'center',
   },
 });
