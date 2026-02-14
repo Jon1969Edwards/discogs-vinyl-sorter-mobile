@@ -16,7 +16,12 @@ import {
 } from 'react-native';
 import type { ReleaseRow } from '../types';
 import { useCollection } from '../hooks/useCollection';
-import { getStoredToken, clearStoredToken } from '../services';
+import {
+  getStoredToken,
+  clearStoredToken,
+  exportAndShare,
+  type ExportFormat,
+} from '../services';
 
 interface CollectionScreenProps {
   onSignOut: () => void;
@@ -57,6 +62,8 @@ export function CollectionScreen({ onSignOut }: CollectionScreenProps) {
   const { state, fetchCollection, reset } = useCollection();
   const [token, setToken] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
     getStoredToken().then(setToken);
@@ -73,6 +80,22 @@ export function CollectionScreen({ onSignOut }: CollectionScreenProps) {
     reset();
     onSignOut();
   }, [onSignOut, reset]);
+
+  const handleExport = useCallback(
+    async (format: ExportFormat) => {
+      if (state.status !== 'success' || state.rows.length === 0) return;
+      setExporting(true);
+      setExportError(null);
+      try {
+        await exportAndShare(state.rows, format);
+      } catch (err) {
+        setExportError(err instanceof Error ? err.message : 'Export failed');
+      } finally {
+        setExporting(false);
+      }
+    },
+    [state]
+  );
 
   const filteredRows =
     state.status === 'success' && search.trim()
@@ -129,9 +152,17 @@ export function CollectionScreen({ onSignOut }: CollectionScreenProps) {
         <Text style={styles.headerTitle}>
           {state.username}'s LPs ({state.rows.length})
         </Text>
-        <TouchableOpacity onPress={handleSignOut}>
-          <Text style={styles.signOut}>Sign Out</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            onPress={() => token && reset()}
+            style={styles.refreshBtn}
+          >
+            <Text style={styles.refreshText}>Refresh</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleSignOut}>
+            <Text style={styles.signOut}>Sign Out</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <TextInput
@@ -141,6 +172,34 @@ export function CollectionScreen({ onSignOut }: CollectionScreenProps) {
         value={search}
         onChangeText={setSearch}
       />
+
+      <View style={styles.exportBar}>
+        <Text style={styles.exportLabel}>Export:</Text>
+        <TouchableOpacity
+          style={[styles.exportBtn, exporting && styles.exportBtnDisabled]}
+          onPress={() => handleExport('txt')}
+          disabled={exporting}
+        >
+          <Text style={styles.exportBtnText}>TXT</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.exportBtn, exporting && styles.exportBtnDisabled]}
+          onPress={() => handleExport('csv')}
+          disabled={exporting}
+        >
+          <Text style={styles.exportBtnText}>CSV</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.exportBtn, exporting && styles.exportBtnDisabled]}
+          onPress={() => handleExport('json')}
+          disabled={exporting}
+        >
+          <Text style={styles.exportBtnText}>JSON</Text>
+        </TouchableOpacity>
+      </View>
+      {exportError ? (
+        <Text style={styles.exportError}>{exportError}</Text>
+      ) : null}
 
       <FlatList
         data={filteredRows}
@@ -184,6 +243,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#eee',
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  refreshBtn: {},
+  refreshText: {
+    color: '#aaa',
+    fontSize: 14,
+  },
   signOut: {
     color: '#e94560',
     fontSize: 14,
@@ -193,9 +262,40 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     marginHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 12,
     fontSize: 16,
     color: '#fff',
+  },
+  exportBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    gap: 8,
+  },
+  exportLabel: {
+    color: '#666',
+    fontSize: 14,
+  },
+  exportBtn: {
+    backgroundColor: '#252542',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  exportBtnDisabled: {
+    opacity: 0.5,
+  },
+  exportBtnText: {
+    color: '#e94560',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  exportError: {
+    color: '#e94560',
+    fontSize: 13,
+    paddingHorizontal: 16,
+    marginBottom: 8,
   },
   loadingText: {
     color: '#aaa',
