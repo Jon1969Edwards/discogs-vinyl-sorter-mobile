@@ -11,23 +11,23 @@ const TOKEN_KEY = 'discogs_token';
 const isWeb = Platform.OS === 'web';
 
 async function getStoredTokenNative(): Promise<string | null> {
-  const Store = (await import('expo-secure-store')).default;
+  const SecureStore = await import('expo-secure-store');
   try {
-    return await Store.getItemAsync(TOKEN_KEY);
+    return await SecureStore.getItemAsync(TOKEN_KEY);
   } catch {
     return null;
   }
 }
 
 async function setStoredTokenNative(token: string): Promise<void> {
-  const Store = (await import('expo-secure-store')).default;
-  await Store.setItemAsync(TOKEN_KEY, token.trim());
+  const SecureStore = await import('expo-secure-store');
+  await SecureStore.setItemAsync(TOKEN_KEY, token.trim());
 }
 
 async function clearStoredTokenNative(): Promise<void> {
   try {
-    const Store = (await import('expo-secure-store')).default;
-    await Store.deleteItemAsync(TOKEN_KEY);
+    const SecureStore = await import('expo-secure-store');
+    await SecureStore.deleteItemAsync(TOKEN_KEY);
   } catch {
     // Ignore
   }
