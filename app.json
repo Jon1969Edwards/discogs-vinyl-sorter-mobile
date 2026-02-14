@@ -22,6 +22,10 @@
       },
       "package": "com.discogvinylsorter.app"
     },
-    "scheme": "discogvinylsorter"
+    "scheme": "discogvinylsorter",
+    "plugins": [
+      "expo-asset",
+      "expo-font"
+    ]
   }
 }
