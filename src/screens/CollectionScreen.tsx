@@ -208,9 +208,7 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
 
       <FlatList
         data={filteredRows}
-        keyExtractor={(item, index) =>
-          `row-${index}-${item.instance_id ?? item.release_id ?? ''}-${item.artist_display}-${item.title}`
-        }
+        keyExtractor={(_, index) => `lp-${index}`}
         renderItem={({ item }) => (
           <AlbumRow
             item={item}
