@@ -10,9 +10,9 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
-  Linking,
 } from 'react-native';
 import type { ReleaseRow } from '../types';
+import { openDiscogsUrl } from '../utils/discogsLinking';
 
 type AlbumDetailScreenProps = {
   route: { params: { release: ReleaseRow } };
@@ -87,7 +87,7 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
       {release.discogs_url ? (
         <TouchableOpacity
           style={styles.discogsButton}
-          onPress={() => Linking.openURL(release.discogs_url)}
+          onPress={() => openDiscogsUrl(release.discogs_url)}
         >
           <Text style={styles.discogsButtonText}>Open on Discogs</Text>
         </TouchableOpacity>
