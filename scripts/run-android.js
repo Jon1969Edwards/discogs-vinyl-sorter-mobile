@@ -62,10 +62,11 @@ function listAvds() {
     const device = devices[0];
     console.log(`Using device: ${device}\n`);
     const expoCli = path.join(projectRoot, 'node_modules', 'expo', 'bin', 'cli');
-    const child = spawn(process.execPath, [expoCli, 'run:android', '-d', device], {
+    const child = spawn(process.execPath, [expoCli, 'run:android'], {
       cwd: projectRoot,
       stdio: 'inherit',
       shell: false,
+      env: { ...process.env, ANDROID_HOME: sdkDir },
     });
     child.on('exit', (code) => process.exit(code ?? 0));
     return;
@@ -95,12 +96,16 @@ function listAvds() {
     await new Promise((r) => setTimeout(r, pollInterval));
     devices = getReadyDevices();
     if (devices.length > 0) {
-      console.log(`\nEmulator ready: ${devices[0]}\n`);
+      const device = devices[0];
+      console.log(`\nEmulator ready: ${device}`);
+      // Brief pause for device to stabilize before Expo queries it
+      await new Promise((r) => setTimeout(r, 5000));
       const expoCli = path.join(projectRoot, 'node_modules', 'expo', 'bin', 'cli');
-      const child = spawn(process.execPath, [expoCli, 'run:android', '-d', devices[0]], {
+      const child = spawn(process.execPath, [expoCli, 'run:android'], {
         cwd: projectRoot,
         stdio: 'inherit',
         shell: false,
+        env: { ...process.env, ANDROID_HOME: sdkDir },
       });
       child.on('exit', (code) => process.exit(code ?? 0));
       return;
