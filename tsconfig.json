@@ -5,7 +5,7 @@
     "jsx": "react-native",
     "lib": ["DOM", "ESNext"],
     "module": "esnext",
-    "moduleResolution": "bundler",
+    "moduleResolution": "nodenext",
     "customConditions": ["react-native"],
     "noEmit": true,
     "resolveJsonModule": true,
