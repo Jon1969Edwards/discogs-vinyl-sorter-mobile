@@ -61,7 +61,8 @@ function listAvds() {
   if (devices.length > 0) {
     const device = devices[0];
     console.log(`Using device: ${device}\n`);
-    const child = spawn('npx', ['expo', 'run:android', '-d', device], {
+    const expoCli = path.join(projectRoot, 'node_modules', 'expo', 'bin', 'cli');
+    const child = spawn(process.execPath, [expoCli, 'run:android', '-d', device], {
       cwd: projectRoot,
       stdio: 'inherit',
       shell: false,
@@ -95,7 +96,8 @@ function listAvds() {
     devices = getReadyDevices();
     if (devices.length > 0) {
       console.log(`\nEmulator ready: ${devices[0]}\n`);
-      const child = spawn('npx', ['expo', 'run:android', '-d', devices[0]], {
+      const expoCli = path.join(projectRoot, 'node_modules', 'expo', 'bin', 'cli');
+      const child = spawn(process.execPath, [expoCli, 'run:android', '-d', devices[0]], {
         cwd: projectRoot,
         stdio: 'inherit',
         shell: false,
