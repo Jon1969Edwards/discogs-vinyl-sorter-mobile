@@ -7,7 +7,7 @@ React Native (Expo) app that replicates the Discogs Vinyl Sorter for Android and
 - **Node.js 18+** – [nodejs.org](https://nodejs.org)
 - **npm** or **yarn**
 - **Expo Go** app on your phone (for development)
-- **Discogs Personal Access Token** or OAuth app credentials
+- **Discogs account** – use OAuth "Sign in with Discogs" or a Personal Access Token
 
 ## Setup
 
@@ -17,12 +17,11 @@ React Native (Expo) app that replicates the Discogs Vinyl Sorter for Android and
 npm install
 ```
 
-2. (Optional) For OAuth, copy `.env.example` to `.env` and add your Discogs app credentials:
+2. (Recommended) For OAuth "Sign in with Discogs", copy `.env.example` to `.env`:
 
-```
-DISCOGS_CONSUMER_KEY=your_key
-DISCOGS_CONSUMER_SECRET=your_secret
-```
+   - Create an app at [Discogs → Settings → Developers](https://www.discogs.com/settings/developers)
+   - Add callback URL: `discogvinylsorter://oauth/callback`
+   - Add your consumer key and secret to `.env`
 
 3. Start the development server:
 

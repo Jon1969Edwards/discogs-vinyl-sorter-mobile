@@ -26,7 +26,8 @@
     "plugins": [
       "expo-asset",
       "expo-font",
-      "./plugins/withAndroidDiscogsQueries.js"
+      "./plugins/withAndroidDiscogsQueries.js",
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {

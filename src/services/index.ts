@@ -16,10 +16,15 @@ export {
 } from './discogsApi';
 
 export {
+  getStoredCredentials,
+  setStoredCredentials,
+  clearStoredCredentials,
+  hasStoredCredentials,
   getStoredToken,
   setStoredToken,
   clearStoredToken,
   hasStoredToken,
+  type DiscogsCredentials,
 } from './auth';
 
 export {

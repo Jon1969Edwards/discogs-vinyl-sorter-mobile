@@ -21,8 +21,8 @@ import { useSettingsContext } from '../contexts/SettingsContext';
 import { sortRows, getSectionLetter } from '../utils';
 import { DEFAULT_SETTINGS } from '../types/settings';
 import {
-  getStoredToken,
-  clearStoredToken,
+  getStoredCredentials,
+  clearStoredCredentials,
   exportAndShare,
   type ExportFormat,
 } from '../services';
@@ -71,7 +71,7 @@ export function WishlistScreen({
 }: WishlistScreenProps) {
   const { settings } = useSettingsContext();
   const { state, fetchWishlist, reset } = useWishlist();
-  const [token, setToken] = useState<string | null>(null);
+  const [credentials, setCredentials] = useState<import('../services').DiscogsCredentials | null>(null);
   const [search, setSearch] = useState('');
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -79,17 +79,17 @@ export function WishlistScreen({
   const effectiveSettings = settings ?? DEFAULT_SETTINGS;
 
   useEffect(() => {
-    getStoredToken().then(setToken);
+    getStoredCredentials().then(setCredentials);
   }, []);
 
   useEffect(() => {
-    if (token && state.status === 'idle') {
-      fetchWishlist(token);
+    if (credentials && state.status === 'idle') {
+      fetchWishlist(credentials);
     }
-  }, [token, state.status, fetchWishlist]);
+  }, [credentials, state.status, fetchWishlist]);
 
   const handleSignOut = useCallback(async () => {
-    await clearStoredToken();
+    await clearStoredCredentials();
     reset();
     onSignOut();
   }, [onSignOut, reset]);
@@ -117,7 +117,12 @@ export function WishlistScreen({
       effectiveSettings.variousPolicy,
       effectiveSettings.sortBy
     );
-  }, [state.status, state.rows, effectiveSettings.variousPolicy, effectiveSettings.sortBy]);
+  }, [
+    state.status,
+    state.status === 'success' ? state.rows : [],
+    effectiveSettings.variousPolicy,
+    effectiveSettings.sortBy,
+  ]);
 
   const filteredRows =
     state.status === 'success' && search.trim()
@@ -203,7 +208,7 @@ export function WishlistScreen({
             <Text style={styles.refreshText}>Settings</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => token && reset()}
+            onPress={() => credentials && reset()}
             style={styles.refreshBtn}
           >
             <Text style={styles.refreshText}>Refresh</Text>

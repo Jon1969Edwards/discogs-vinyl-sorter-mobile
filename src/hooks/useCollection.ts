@@ -5,6 +5,7 @@
 
 import { useState, useCallback } from 'react';
 import type { ReleaseRow } from '../types';
+import type { DiscogsCredentials } from '../services/auth';
 import {
   createDiscogsClient,
   getIdentity,
@@ -27,12 +28,12 @@ export function useCollection() {
   const [state, setState] = useState<CollectionState>({ status: 'idle' });
 
   const fetchCollection = useCallback(
-    async (token: string, options: FetchOptions = {}) => {
+    async (credentials: DiscogsCredentials, options: FetchOptions = {}) => {
       const { lpStrict = false } = options;
       setState({ status: 'loading', message: 'Connecting to Discogs…' });
 
       try {
-        const client = createDiscogsClient(token);
+        const client = createDiscogsClient(credentials);
         const identity = await getIdentity(client);
         setState({
           status: 'loading',

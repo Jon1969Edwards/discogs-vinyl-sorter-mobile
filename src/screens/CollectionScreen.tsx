@@ -21,8 +21,8 @@ import { useSettingsContext } from '../contexts/SettingsContext';
 import { sortRows, getSectionLetter } from '../utils';
 import { DEFAULT_SETTINGS } from '../types/settings';
 import {
-  getStoredToken,
-  clearStoredToken,
+  getStoredCredentials,
+  clearStoredCredentials,
   exportAndShare,
   type ExportFormat,
 } from '../services';
@@ -74,7 +74,7 @@ function AlbumRow({
 export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProps) {
   const { settings } = useSettingsContext();
   const { state, fetchCollection, reset } = useCollection();
-  const [token, setToken] = useState<string | null>(null);
+  const [credentials, setCredentials] = useState<import('../services').DiscogsCredentials | null>(null);
   const [search, setSearch] = useState('');
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -82,14 +82,14 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
   const effectiveSettings = settings ?? DEFAULT_SETTINGS;
 
   useEffect(() => {
-    getStoredToken().then(setToken);
+    getStoredCredentials().then(setCredentials);
   }, []);
 
   useEffect(() => {
-    if (token && state.status === 'idle') {
-      fetchCollection(token, { lpStrict: effectiveSettings.lpStrict });
+    if (credentials && state.status === 'idle') {
+      fetchCollection(credentials, { lpStrict: effectiveSettings.lpStrict });
     }
-  }, [token, state.status, fetchCollection, effectiveSettings.lpStrict]);
+  }, [credentials, state.status, fetchCollection, effectiveSettings.lpStrict]);
 
   const prevLpStrict = useRef<boolean | null>(null);
   const hasFetched = useRef(false);
@@ -101,16 +101,16 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
       hasFetched.current &&
       prevLpStrict.current !== null &&
       prevLpStrict.current !== effectiveSettings.lpStrict &&
-      token
+      credentials
     ) {
       prevLpStrict.current = effectiveSettings.lpStrict;
       reset();
     }
     prevLpStrict.current = effectiveSettings.lpStrict;
-  }, [effectiveSettings.lpStrict, token, reset]);
+  }, [effectiveSettings.lpStrict, credentials, reset]);
 
   const handleSignOut = useCallback(async () => {
-    await clearStoredToken();
+    await clearStoredCredentials();
     reset();
     onSignOut();
   }, [onSignOut, reset]);
@@ -138,7 +138,12 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
       effectiveSettings.variousPolicy,
       effectiveSettings.sortBy
     );
-  }, [state.status, state.rows, effectiveSettings.variousPolicy, effectiveSettings.sortBy]);
+  }, [
+    state.status,
+    state.status === 'success' ? state.rows : [],
+    effectiveSettings.variousPolicy,
+    effectiveSettings.sortBy,
+  ]);
 
   const filteredRows =
     state.status === 'success' && search.trim()
@@ -224,7 +229,7 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
             <Text style={styles.refreshText}>Settings</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => token && reset()}
+            onPress={() => credentials && reset()}
             style={styles.refreshBtn}
           >
             <Text style={styles.refreshText}>Refresh</Text>

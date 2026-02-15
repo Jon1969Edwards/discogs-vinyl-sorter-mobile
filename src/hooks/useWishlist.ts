@@ -5,6 +5,7 @@
 
 import { useState, useCallback } from 'react';
 import type { ReleaseRow } from '../types';
+import type { DiscogsCredentials } from '../services/auth';
 import {
   createDiscogsClient,
   getIdentity,
@@ -35,11 +36,11 @@ export type WishlistState =
 export function useWishlist() {
   const [state, setState] = useState<WishlistState>({ status: 'idle' });
 
-  const fetchWishlist = useCallback(async (token: string) => {
+  const fetchWishlist = useCallback(async (credentials: DiscogsCredentials) => {
     setState({ status: 'loading', message: 'Connecting to Discogs…' });
 
     try {
-      const client = createDiscogsClient(token);
+      const client = createDiscogsClient(credentials);
       const identity = await getIdentity(client);
       setState({
         status: 'loading',

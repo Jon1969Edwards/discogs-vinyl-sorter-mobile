@@ -1,5 +1,5 @@
 /**
- * Auth screen – enter Discogs Personal Access Token.
+ * Auth screen – Sign in with Discogs (OAuth) or enter Personal Access Token.
  */
 
 import React, { useState, useCallback } from 'react';
@@ -13,9 +13,19 @@ import {
   Platform,
   ActivityIndicator,
   Linking,
+  ScrollView,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { setStoredToken, getStoredToken } from '../services';
+import {
+  DISCOGS_CONSUMER_KEY,
+  DISCOGS_CONSUMER_SECRET,
+} from '@env';
+import {
+  setStoredCredentials,
+  setStoredToken,
+  getStoredCredentials,
+} from '../services';
+import { runDiscogsOAuthFlow } from '../services/oauthDiscogs';
 
 const DISCOGS_TOKEN_URL = 'https://www.discogs.com/settings/developers';
 
@@ -26,17 +36,54 @@ interface AuthScreenProps {
 export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [token, setToken] = useState('');
   const [loading, setLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkingStored, setCheckingStored] = useState(true);
+  const [showManualEntry, setShowManualEntry] = useState(false);
 
   React.useEffect(() => {
-    getStoredToken().then((stored) => {
+    getStoredCredentials().then((cred) => {
       setCheckingStored(false);
-      if (stored) {
-        setToken(stored);
+      if (cred?.type === 'pat') {
+        setToken(cred.token);
       }
     });
   }, []);
+
+  const handleOAuthSignIn = useCallback(async () => {
+    if (!DISCOGS_CONSUMER_KEY?.trim() || !DISCOGS_CONSUMER_SECRET?.trim()) {
+      setError(
+        'OAuth not configured. Add DISCOGS_CONSUMER_KEY and DISCOGS_CONSUMER_SECRET to your .env file. Create an app at Discogs → Settings → Developers.'
+      );
+      return;
+    }
+
+    setOauthLoading(true);
+    setError(null);
+
+    try {
+      const tokens = await runDiscogsOAuthFlow(
+        DISCOGS_CONSUMER_KEY.trim(),
+        DISCOGS_CONSUMER_SECRET.trim()
+      );
+      await setStoredCredentials({
+        type: 'oauth',
+        token: tokens.token,
+        secret: tokens.secret,
+      });
+      onAuthenticated();
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : 'OAuth failed';
+      if (msg.toLowerCase().includes('cancelled')) {
+        setError('Sign-in was cancelled.');
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setOauthLoading(false);
+    }
+  }, [onAuthenticated]);
 
   const handleSubmit = useCallback(async () => {
     const t = token.trim();
@@ -82,67 +129,114 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     );
   }
 
+  const isOauthLoading = oauthLoading;
+  const isSubmitLoading = loading;
+  const anyLoading = isOauthLoading || isSubmitLoading;
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.content}>
-        <Text style={styles.title}>Discogs Vinyl Sorter</Text>
-        <Text style={styles.subtitle}>
-          Enter your Discogs Personal Access Token to load your collection.
-        </Text>
-        <Text style={styles.hint}>
-          You need a computer to create a token. Then paste it here or use the
-          same token on both devices.
-        </Text>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.content}>
+          <Text style={styles.title}>Discogs Vinyl Sorter</Text>
+          <Text style={styles.subtitle}>
+            Sign in with Discogs to load your collection.
+          </Text>
 
-        <TouchableOpacity
-          style={styles.linkButton}
-          onPress={handleOpenDiscogs}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.linkText}>Open Discogs to get token</Text>
-        </TouchableOpacity>
+          {!showManualEntry ? (
+            <>
+              <TouchableOpacity
+                style={[styles.oauthButton, anyLoading && styles.buttonDisabled]}
+                onPress={handleOAuthSignIn}
+                disabled={anyLoading}
+                activeOpacity={0.7}
+              >
+                {isOauthLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.oauthButtonText}>Sign in with Discogs</Text>
+                )}
+              </TouchableOpacity>
 
-        <View style={styles.inputRow}>
-          <TextInput
-            style={[styles.input, styles.inputFlex]}
-            placeholder="Paste your token here"
-            placeholderTextColor="#666"
-            value={token}
-            onChangeText={(v) => {
-              setToken(v);
-              setError(null);
-            }}
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!loading}
-          />
-          <TouchableOpacity
-            style={styles.pasteButton}
-            onPress={handlePaste}
-            disabled={loading}
-          >
-            <Text style={styles.pasteButtonText}>Paste</Text>
-          </TouchableOpacity>
-        </View>
-
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-
-        <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
+              <TouchableOpacity
+                style={styles.linkButton}
+                onPress={() => setShowManualEntry(true)}
+                disabled={anyLoading}
+              >
+                <Text style={styles.linkText}>
+                  Or enter a Personal Access Token
+                </Text>
+              </TouchableOpacity>
+            </>
           ) : (
-            <Text style={styles.buttonText}>Continue</Text>
+            <>
+              <Text style={styles.hint}>
+                Paste a token from Discogs (Settings → Developers → Generate
+                token).
+              </Text>
+
+              <TouchableOpacity
+                style={styles.linkButton}
+                onPress={handleOpenDiscogs}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.linkText}>Open Discogs to get token</Text>
+              </TouchableOpacity>
+
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={[styles.input, styles.inputFlex]}
+                  placeholder="Paste your token here"
+                  placeholderTextColor="#666"
+                  value={token}
+                  onChangeText={(v) => {
+                    setToken(v);
+                    setError(null);
+                  }}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!anyLoading}
+                />
+                <TouchableOpacity
+                  style={styles.pasteButton}
+                  onPress={handlePaste}
+                  disabled={anyLoading}
+                >
+                  <Text style={styles.pasteButtonText}>Paste</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.button, anyLoading && styles.buttonDisabled]}
+                onPress={handleSubmit}
+                disabled={anyLoading}
+              >
+                {isSubmitLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>Continue</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.backLink}
+                onPress={() => setShowManualEntry(false)}
+                disabled={anyLoading}
+              >
+                <Text style={styles.linkText}>← Back to Sign in with Discogs</Text>
+              </TouchableOpacity>
+            </>
           )}
-        </TouchableOpacity>
-      </View>
+
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -159,6 +253,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingVertical: 24,
+  },
   content: {
     padding: 24,
   },
@@ -171,18 +270,33 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#aaa',
-    marginBottom: 8,
+    marginBottom: 24,
   },
   hint: {
     fontSize: 13,
     color: '#666',
     marginBottom: 16,
   },
+  oauthButton: {
+    backgroundColor: '#e94560',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  oauthButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   linkButton: {
     marginBottom: 20,
     padding: 12,
-    backgroundColor: '#252542',
-    borderRadius: 8,
+    backgroundColor: 'transparent',
+  },
+  backLink: {
+    marginTop: 16,
+    padding: 12,
   },
   linkText: {
     color: '#e94560',
@@ -218,10 +332,10 @@ const styles = StyleSheet.create({
   error: {
     color: '#e94560',
     fontSize: 14,
-    marginBottom: 16,
+    marginTop: 16,
   },
   button: {
-    backgroundColor: '#e94560',
+    backgroundColor: '#252542',
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',

@@ -1,12 +1,25 @@
 /**
  * Discogs API client with retry logic and rate limiting.
  * Mirrors the Windows app's api.py behavior.
+ * Supports both PAT (token) and OAuth 1.0a authentication.
  */
 
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
+import OAuth from 'oauth-1.0a';
+import CryptoJS from 'crypto-js';
+import {
+  DISCOGS_CONSUMER_KEY,
+  DISCOGS_CONSUMER_SECRET,
+} from '@env';
+import type { DiscogsCredentials } from './auth';
 
 const API_BASE = 'https://api.discogs.com';
 const USER_AGENT = 'DiscogsVinylSorter/1.0 (https://github.com/discogs-vinyl-sorter-mobile)';
+
+function hmacSha1Base64(message: string, key: string): string {
+  const hash = CryptoJS.HmacSHA1(message, key);
+  return CryptoJS.enc.Base64.stringify(hash);
+}
 
 // ---------------------------------------------------------------------------
 // Types (Discogs API responses)
@@ -78,16 +91,65 @@ export interface DiscogsMarketplaceStats {
 // API client factory
 // ---------------------------------------------------------------------------
 
-export function createDiscogsClient(token: string): AxiosInstance {
+/**
+ * Create a Discogs API client. Accepts either credentials object (PAT or OAuth)
+ * or a legacy token string (treated as PAT).
+ */
+export function createDiscogsClient(
+  credentialsOrToken: DiscogsCredentials | string
+): AxiosInstance {
+  const cred: DiscogsCredentials =
+    typeof credentialsOrToken === 'string'
+      ? { type: 'pat', token: credentialsOrToken }
+      : credentialsOrToken;
+
   const client = axios.create({
     baseURL: API_BASE,
     timeout: 30000,
     headers: {
-      Authorization: `Discogs token=${token}`,
       'User-Agent': USER_AGENT,
       Accept: 'application/json',
     },
   });
+
+  if (cred.type === 'pat') {
+    client.defaults.headers.common['Authorization'] = `Discogs token=${cred.token}`;
+  } else {
+    // OAuth 1.0a: sign each request
+    if (!DISCOGS_CONSUMER_KEY || !DISCOGS_CONSUMER_SECRET) {
+      throw new Error(
+        'OAuth requires DISCOGS_CONSUMER_KEY and DISCOGS_CONSUMER_SECRET in .env'
+      );
+    }
+    const oauth = new OAuth({
+      consumer: {
+        key: DISCOGS_CONSUMER_KEY,
+        secret: DISCOGS_CONSUMER_SECRET,
+      },
+      signature_method: 'HMAC-SHA1',
+      hash_function(baseString: string, key: string) {
+        return hmacSha1Base64(baseString, key);
+      },
+    });
+    const token = { key: cred.token, secret: cred.secret };
+
+    client.interceptors.request.use((config) => {
+      const url = config.url ?? '';
+      const base = config.baseURL ?? API_BASE;
+      const fullUrl = base.replace(/\/$/, '') + (url.startsWith('/') ? url : '/' + url);
+      const params = (config.params as Record<string, string> | undefined) ?? {};
+      const method = (config.method ?? 'GET').toUpperCase();
+      const requestData = {
+        url: fullUrl,
+        method,
+        data: params,
+      };
+      const authHeader = oauth.toHeader(oauth.authorize(requestData, token));
+      config.headers = config.headers ?? {};
+      config.headers['Authorization'] = authHeader.Authorization;
+      return config;
+    });
+  }
 
   // Response interceptor: rate limit pause
   client.interceptors.response.use(
@@ -99,7 +161,6 @@ export function createDiscogsClient(token: string): AxiosInstance {
       if (remaining <= 1) {
         // Will be handled async – we can't block on React Native, so we just
         // let the next request potentially hit rate limit. The retry will handle it.
-        // For now, no synchronous sleep – axios-interceptors can't easily delay.
       }
       return response;
     },

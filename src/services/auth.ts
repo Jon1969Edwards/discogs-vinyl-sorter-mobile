@@ -1,70 +1,177 @@
 /**
- * Secure token storage. Uses Expo SecureStore on native (iOS/Android),
+ * Secure credential storage. Uses Expo SecureStore on native (iOS/Android),
  * localStorage on web (SecureStore is not supported in the browser).
+ * Supports both Personal Access Token (PAT) and OAuth (token + secret).
  */
 
 import { Platform } from 'react-native';
 
-const TOKEN_KEY = 'discogs_token';
+const AUTH_KEY = 'discogs_auth';
+const LEGACY_TOKEN_KEY = 'discogs_token';
 
-// SecureStore only works on iOS/Android; use localStorage on web
+export type DiscogsCredentials =
+  | { type: 'pat'; token: string }
+  | { type: 'oauth'; token: string; secret: string };
+
 const isWeb = Platform.OS === 'web';
 
-async function getStoredTokenNative(): Promise<string | null> {
+async function getStoredAuthNative(): Promise<string | null> {
   const SecureStore = await import('expo-secure-store');
   try {
-    return await SecureStore.getItemAsync(TOKEN_KEY);
+    return await SecureStore.getItemAsync(AUTH_KEY);
   } catch {
     return null;
   }
 }
 
-async function setStoredTokenNative(token: string): Promise<void> {
+async function getLegacyTokenNative(): Promise<string | null> {
   const SecureStore = await import('expo-secure-store');
-  await SecureStore.setItemAsync(TOKEN_KEY, token.trim());
+  try {
+    return await SecureStore.getItemAsync(LEGACY_TOKEN_KEY);
+  } catch {
+    return null;
+  }
 }
 
-async function clearStoredTokenNative(): Promise<void> {
+async function setStoredAuthNative(json: string): Promise<void> {
+  const SecureStore = await import('expo-secure-store');
+  await SecureStore.setItemAsync(AUTH_KEY, json);
+}
+
+async function clearStoredAuthNative(): Promise<void> {
+  const SecureStore = await import('expo-secure-store');
   try {
-    const SecureStore = await import('expo-secure-store');
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    await SecureStore.deleteItemAsync(AUTH_KEY);
+    await SecureStore.deleteItemAsync(LEGACY_TOKEN_KEY);
   } catch {
     // Ignore
   }
 }
 
-export async function getStoredToken(): Promise<string | null> {
+function parseCredentials(json: string | null): DiscogsCredentials | null {
+  if (!json || !json.trim()) return null;
+  try {
+    const parsed = JSON.parse(json) as unknown;
+    if (!parsed || typeof parsed !== 'object') return null;
+    const obj = parsed as Record<string, unknown>;
+    if (obj.type === 'pat' && typeof obj.token === 'string' && obj.token.trim()) {
+      return { type: 'pat', token: obj.token.trim() };
+    }
+    if (
+      obj.type === 'oauth' &&
+      typeof obj.token === 'string' &&
+      typeof obj.secret === 'string' &&
+      obj.token.trim() &&
+      obj.secret.trim()
+    ) {
+      return { type: 'oauth', token: obj.token.trim(), secret: obj.secret.trim() };
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return null;
+}
+
+/** Migrate from legacy token-only storage to new credentials format. */
+async function migrateFromLegacy(): Promise<DiscogsCredentials | null> {
   if (isWeb && typeof localStorage !== 'undefined') {
     try {
-      return localStorage.getItem(TOKEN_KEY);
+      const legacy = localStorage.getItem(LEGACY_TOKEN_KEY);
+      if (legacy?.trim()) {
+        const cred: DiscogsCredentials = { type: 'pat', token: legacy.trim() };
+        localStorage.setItem(AUTH_KEY, JSON.stringify(cred));
+        localStorage.removeItem(LEGACY_TOKEN_KEY);
+        return cred;
+      }
+    } catch {
+      // Ignore
+    }
+    return null;
+  }
+  const legacy = await getLegacyTokenNative();
+  if (legacy?.trim()) {
+    const cred: DiscogsCredentials = { type: 'pat', token: legacy.trim() };
+    await setStoredAuthNative(JSON.stringify(cred));
+    try {
+      const SecureStore = await import('expo-secure-store');
+      await SecureStore.deleteItemAsync(LEGACY_TOKEN_KEY);
+    } catch {
+      // Ignore
+    }
+    return cred;
+  }
+  return null;
+}
+
+export async function getStoredCredentials(): Promise<DiscogsCredentials | null> {
+  let json: string | null;
+  if (isWeb && typeof localStorage !== 'undefined') {
+    try {
+      json = localStorage.getItem(AUTH_KEY);
+      if (!json) {
+        return migrateFromLegacy();
+      }
+      return parseCredentials(json);
     } catch {
       return null;
     }
   }
-  return getStoredTokenNative();
+  json = await getStoredAuthNative();
+  if (!json) {
+    return migrateFromLegacy();
+  }
+  return parseCredentials(json);
 }
 
-export async function setStoredToken(token: string): Promise<void> {
+export async function setStoredCredentials(cred: DiscogsCredentials): Promise<void> {
+  const json = JSON.stringify(cred);
   if (isWeb && typeof localStorage !== 'undefined') {
-    localStorage.setItem(TOKEN_KEY, token.trim());
+    localStorage.setItem(AUTH_KEY, json);
     return;
   }
-  await setStoredTokenNative(token);
+  await setStoredAuthNative(json);
 }
 
-export async function clearStoredToken(): Promise<void> {
+export async function clearStoredCredentials(): Promise<void> {
   if (isWeb && typeof localStorage !== 'undefined') {
     try {
-      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(AUTH_KEY);
+      localStorage.removeItem(LEGACY_TOKEN_KEY);
     } catch {
       // Ignore
     }
     return;
   }
-  await clearStoredTokenNative();
+  await clearStoredAuthNative();
 }
 
+export async function hasStoredCredentials(): Promise<boolean> {
+  const cred = await getStoredCredentials();
+  return cred !== null;
+}
+
+// ---------------------------------------------------------------------------
+// Legacy API – for backward compatibility, maps to credentials
+// ---------------------------------------------------------------------------
+
+/** @deprecated Use getStoredCredentials instead. Returns token for PAT; for OAuth returns null (use getStoredCredentials). */
+export async function getStoredToken(): Promise<string | null> {
+  const cred = await getStoredCredentials();
+  if (!cred) return null;
+  return cred.token;
+}
+
+/** Store a Personal Access Token. */
+export async function setStoredToken(token: string): Promise<void> {
+  await setStoredCredentials({ type: 'pat', token: token.trim() });
+}
+
+/** @deprecated Use clearStoredCredentials instead. */
+export async function clearStoredToken(): Promise<void> {
+  await clearStoredCredentials();
+}
+
+/** @deprecated Use hasStoredCredentials instead. */
 export async function hasStoredToken(): Promise<boolean> {
-  const token = await getStoredToken();
-  return token !== null && token.length > 0;
+  return hasStoredCredentials();
 }

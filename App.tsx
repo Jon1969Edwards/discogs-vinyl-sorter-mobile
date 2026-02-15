@@ -14,7 +14,7 @@ import { AlbumDetailScreen } from './src/screens/AlbumDetailScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { MainTabs } from './src/navigation/MainTabs';
 import { SettingsProvider } from './src/contexts/SettingsContext';
-import { getStoredToken } from './src/services';
+import { hasStoredCredentials } from './src/services';
 
 const Stack = createNativeStackNavigator();
 
@@ -22,9 +22,7 @@ export default function App() {
   const [hasToken, setHasToken] = useState<boolean | null>(null);
 
   useEffect(() => {
-    getStoredToken().then((token) => {
-      setHasToken(token !== null && token.length > 0);
-    });
+    hasStoredCredentials().then(setHasToken);
   }, []);
 
   const handleAuthenticated = () => setHasToken(true);
