@@ -1,10 +1,9 @@
 /**
  * Open Discogs release URL – prefers native app on Android when installed.
- * Falls back to in-app browser (WebBrowser) when Discogs app is unavailable.
+ * Falls back to system browser when Discogs app is unavailable.
  */
 
 import { Linking, Platform } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
 
 const DISCOGS_APP_PACKAGE = 'com.discogs.app';
 
@@ -14,19 +13,12 @@ function getReleaseIdFromUrl(url: string): string | null {
   return match ? match[1] : null;
 }
 
-/** Open URL in in-app browser (Chrome Custom Tabs / SFSafariViewController) */
-async function openInAppBrowser(url: string): Promise<void> {
-  await WebBrowser.openBrowserAsync(url, {
-    presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
-  });
-}
-
 /**
  * Opens a Discogs release (or other) URL. On Android, tries in order:
  * 1. discogs://release/ID (custom scheme – if Discogs app supports it)
  * 2. Intent VIEW with packageName (open in Discogs app if it handles https)
  * 3. Intent VIEW without packageName (may show app chooser)
- * 4. Fall back to in-app browser
+ * 4. Fall back to system browser
  */
 export async function openDiscogsUrl(url: string): Promise<void> {
   if (Platform.OS === 'web') {
@@ -82,16 +74,11 @@ export async function openDiscogsUrl(url: string): Promise<void> {
       // Continue to fallback
     }
 
-    // 4. Fall back to in-app browser (keeps user in app)
-    await openInAppBrowser(url);
+    // 4. Fall back to system browser
+    await Linking.openURL(url);
     return;
   }
 
-  // iOS: use the https URL – Universal Links may open in app if installed;
-  // otherwise use in-app browser
-  try {
-    await Linking.openURL(url);
-  } catch {
-    await openInAppBrowser(url);
-  }
+  // iOS: use the https URL – Universal Links may open in app if installed
+  await Linking.openURL(url);
 }
