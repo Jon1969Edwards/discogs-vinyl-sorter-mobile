@@ -1,64 +1,114 @@
-/**
- * Settings screen – sort options, dividers, LP strict.
- */
-
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
+  Switch,
+  TouchableOpacity,
+  TextInput,
 } from 'react-native';
-import type { CollectionSettings } from '../types/settings';
-import type { SortBy, VariousPolicy } from '../utils/sorting';
-import { useSettingsContext } from '../contexts/SettingsContext';
+import { useSettings } from '../hooks/useSettings';
+import type { DividerMode, SortBy } from '../types';
+import { FORMAT_FILTERS } from '../domain/formatFilter';
+import { clearAllAuth } from '../services';
 
-type SettingsScreenProps = {
-  navigation: { goBack: () => void };
-};
-
-const SORT_OPTIONS: { value: SortBy; label: string }[] = [
-  { value: 'artist', label: 'Artist' },
-  { value: 'title', label: 'Title' },
-  { value: 'year', label: 'Year' },
+const DIVIDER_OPTIONS: { id: DividerMode; label: string }[] = [
+  { id: 'none', label: 'None' },
+  { id: 'letter', label: 'A–Z letters' },
+  { id: 'abc', label: 'Shelf A/B/C' },
 ];
 
-const VARIOUS_OPTIONS: { value: VariousPolicy; label: string }[] = [
-  { value: 'normal', label: 'Normal' },
-  { value: 'last', label: 'At end' },
-  { value: 'title', label: 'By title' },
+const SORT_OPTIONS: { id: SortBy; label: string }[] = [
+  { id: 'artist', label: 'Artist' },
+  { id: 'title', label: 'Title' },
+  { id: 'year', label: 'Year' },
+  { id: 'price_asc', label: 'Price (low first)' },
+  { id: 'price_desc', label: 'Price (high first)' },
 ];
 
-function OptionRow({
-  label,
-  value,
-  options,
-  onSelect,
-}: {
-  label: string;
-  value: string;
-  options: { value: string; label: string }[];
-  onSelect: (value: string) => void;
-}) {
+interface SettingsScreenProps {
+  onSignOut: () => void;
+  onSettingsChanged?: () => void;
+}
+
+export function SettingsScreen({
+  onSignOut,
+  onSettingsChanged,
+}: SettingsScreenProps) {
+  const { settings, loaded, update } = useSettings();
+
+  const toggleFormat = useCallback(
+    async (fmt: string) => {
+      let formats = [...settings.formats];
+      if (fmt === 'everything') {
+        formats = formats.includes('everything') ? ['lp'] : ['everything'];
+      } else {
+        formats = formats.filter((f) => f !== 'everything');
+        if (formats.includes(fmt)) {
+          formats = formats.filter((f) => f !== fmt);
+        } else {
+          formats.push(fmt);
+        }
+        if (formats.length === 0) formats = ['lp'];
+      }
+      await update({ formats });
+      onSettingsChanged?.();
+    },
+    [settings.formats, update, onSettingsChanged]
+  );
+
+  const handleSignOut = useCallback(async () => {
+    await clearAllAuth();
+    onSignOut();
+  }, [onSignOut]);
+
+  if (!loaded) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.muted}>Loading settings…</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.optionRow}>
-      <Text style={styles.optionLabel}>{label}</Text>
-      <View style={styles.optionChips}>
-        {options.map((opt) => (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <Text style={styles.sectionTitle}>Formats</Text>
+      {FORMAT_FILTERS.map(([id, label]) => (
+        <View key={id} style={styles.row}>
+          <Text style={styles.label}>{label}</Text>
+          <Switch
+            value={
+              id === 'everything'
+                ? settings.formats.includes('everything')
+                : settings.formats.includes(id)
+            }
+            onValueChange={() => toggleFormat(id)}
+            trackColor={{ false: '#252542', true: '#e94560' }}
+            thumbColor="#eee"
+            ios_backgroundColor="#252542"
+          />
+        </View>
+      ))}
+
+      <Text style={styles.sectionTitle}>Export dividers</Text>
+      <View style={styles.chipRow}>
+        {DIVIDER_OPTIONS.map((opt) => (
           <TouchableOpacity
-            key={opt.value}
+            key={opt.id}
             style={[
               styles.chip,
-              value === opt.value && styles.chipSelected,
+              settings.divider_mode === opt.id && styles.chipActive,
             ]}
-            onPress={() => onSelect(opt.value)}
+            onPress={async () => {
+              await update({ divider_mode: opt.id });
+              onSettingsChanged?.();
+            }}
           >
             <Text
               style={[
                 styles.chipText,
-                value === opt.value && styles.chipTextSelected,
+                settings.divider_mode === opt.id && styles.chipTextActive,
               ]}
             >
               {opt.label}
@@ -66,199 +116,134 @@ function OptionRow({
           </TouchableOpacity>
         ))}
       </View>
-    </View>
-  );
-}
 
-function ToggleRow({
-  label,
-  subtitle,
-  value,
-  onToggle,
-}: {
-  label: string;
-  subtitle?: string;
-  value: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <TouchableOpacity style={styles.toggleRow} onPress={onToggle} activeOpacity={0.7}>
-      <View style={styles.toggleLabelWrap}>
-        <Text style={styles.optionLabel}>{label}</Text>
-        {subtitle ? (
-          <Text style={styles.toggleSubtitle}>{subtitle}</Text>
-        ) : null}
-      </View>
-      <View style={[styles.toggle, value && styles.toggleOn]}>
-        <View style={[styles.toggleThumb, value && styles.toggleThumbOn]} />
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-export function SettingsScreen({ navigation }: SettingsScreenProps) {
-  const { settings, updateSettings } = useSettingsContext();
-  if (!settings) {
-    return (
-      <View style={styles.wrapper}>
-        <View style={styles.header}>
+      <Text style={styles.sectionTitle}>Sort by</Text>
+      <View style={styles.chipRow}>
+        {SORT_OPTIONS.map((opt) => (
           <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
+            key={opt.id}
+            style={[
+              styles.chip,
+              settings.sort_by === opt.id && styles.chipActive,
+            ]}
+            onPress={async () => {
+              await update({ sort_by: opt.id });
+              onSettingsChanged?.();
+            }}
           >
-            <Text style={styles.backButtonText}>← Back</Text>
+            <Text
+              style={[
+                styles.chipText,
+                settings.sort_by === opt.id && styles.chipTextActive,
+              ]}
+            >
+              {opt.label}
+            </Text>
           </TouchableOpacity>
-        </View>
-        <View style={styles.loading}>
-          <ActivityIndicator size="large" color="#e94560" />
-        </View>
+        ))}
       </View>
-    );
-  }
-  return (
-    <View style={styles.wrapper}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>← Back</Text>
-        </TouchableOpacity>
+
+      <View style={styles.row}>
+        <Text style={styles.label}>Show prices in list</Text>
+        <Switch
+          value={settings.show_prices}
+          onValueChange={(v) => update({ show_prices: v })}
+          trackColor={{ false: '#444', true: '#e94560' }}
+        />
       </View>
-      <ScrollView style={styles.content}>
-        <Text style={styles.title}>Settings</Text>
 
-        <OptionRow
-          label="Sort by"
-          value={settings.sortBy}
-          options={SORT_OPTIONS}
-          onSelect={(v) => updateSettings({ sortBy: v as SortBy })}
+      <View style={styles.row}>
+        <Text style={styles.label}>Include JSON in exports</Text>
+        <Switch
+          value={settings.write_json}
+          onValueChange={(v) => update({ write_json: v })}
+          trackColor={{ false: '#444', true: '#e94560' }}
         />
+      </View>
 
-        <OptionRow
-          label="Various Artists"
-          value={settings.variousPolicy}
-          options={VARIOUS_OPTIONS}
-          onSelect={(v) => updateSettings({ variousPolicy: v as VariousPolicy })}
-        />
+      <Text style={styles.sectionTitle}>Poll interval (seconds)</Text>
+      <TextInput
+        style={styles.input}
+        keyboardType="number-pad"
+        value={String(settings.poll_seconds)}
+        onChangeText={(t) => {
+          const n = parseInt(t, 10);
+          if (!Number.isNaN(n) && n >= 60) update({ poll_seconds: n });
+        }}
+      />
 
-        <ToggleRow
-          label="Letter dividers"
-          subtitle="Show A, B, C sections in the list"
-          value={settings.showDividers}
-          onToggle={() => updateSettings({ showDividers: !settings.showDividers })}
-        />
+      <Text style={styles.sectionTitle}>Currency</Text>
+      <TextInput
+        style={styles.input}
+        autoCapitalize="characters"
+        maxLength={3}
+        value={settings.currency}
+        onChangeText={(t) => update({ currency: t.toUpperCase().slice(0, 3) })}
+      />
 
-        <ToggleRow
-          label="LP strict"
-          subtitle="Exclude 12″ singles; only LP/Album formats"
-          value={settings.lpStrict}
-          onToggle={() => updateSettings({ lpStrict: !settings.lpStrict })}
-        />
-      </ScrollView>
-    </View>
+      <Text style={styles.sectionTitle}>User-Agent (advanced)</Text>
+      <TextInput
+        style={[styles.input, styles.inputMulti]}
+        multiline
+        value={settings.user_agent}
+        onChangeText={(t) => update({ user_agent: t })}
+      />
+
+      <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
+        <Text style={styles.signOutText}>Sign Out</Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
+  container: { flex: 1, backgroundColor: '#1a1a2e' },
+  content: { padding: 16, paddingTop: 48, paddingBottom: 32 },
+  center: {
     flex: 1,
     backgroundColor: '#1a1a2e',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 48,
-    paddingBottom: 12,
-  },
-  backButton: {
-    paddingVertical: 8,
-    paddingRight: 16,
-  },
-  backButtonText: {
-    color: '#e94560',
-    fontSize: 16,
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#eee',
-    marginBottom: 24,
-  },
-  optionRow: {
-    marginBottom: 20,
-  },
-  optionLabel: {
-    fontSize: 14,
-    color: '#aaa',
-    marginBottom: 8,
-  },
-  optionChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#252542',
-  },
-  chipSelected: {
-    backgroundColor: '#e94560',
-  },
-  chipText: {
-    color: '#aaa',
-    fontSize: 14,
-  },
-  chipTextSelected: {
-    color: '#fff',
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#252542',
-  },
-  toggleLabelWrap: {
-    flex: 1,
-  },
-  toggleSubtitle: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 2,
-  },
-  toggle: {
-    width: 50,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#252542',
-    padding: 2,
-    flexDirection: 'row',
-  },
-  toggleOn: {
-    backgroundColor: '#e94560',
-    justifyContent: 'flex-end',
-  },
-  toggleThumb: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#666',
-  },
-  toggleThumbOn: {
-    backgroundColor: '#fff',
-  },
-  loading: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#eee',
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  label: { color: '#ccc', fontSize: 15, flex: 1 },
+  muted: { color: '#666' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  chip: {
+    backgroundColor: '#252542',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  chipActive: { backgroundColor: '#e94560' },
+  chipText: { color: '#aaa', fontSize: 13 },
+  chipTextActive: { color: '#fff', fontWeight: '600' },
+  input: {
+    backgroundColor: '#252542',
+    borderRadius: 8,
+    padding: 12,
+    color: '#fff',
+    marginBottom: 8,
+  },
+  inputMulti: { minHeight: 60 },
+  signOutBtn: {
+    marginTop: 32,
+    backgroundColor: '#e94560',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  signOutText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 });

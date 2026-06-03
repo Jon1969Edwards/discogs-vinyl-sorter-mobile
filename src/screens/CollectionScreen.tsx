@@ -17,9 +17,9 @@ import {
 } from 'react-native';
 import type { ReleaseRow } from '../types';
 import { useCollection } from '../hooks/useCollection';
-import { useSettingsContext } from '../contexts/SettingsContext';
+import { useSettings } from '../context/SettingsContext';
 import { sortRows, getSectionLetter } from '../utils';
-import { DEFAULT_SETTINGS } from '../types/settings';
+import { GUI_BUILD_SORT } from '../types';
 import {
   getStoredCredentials,
   clearStoredCredentials,
@@ -72,26 +72,26 @@ function AlbumRow({
 }
 
 export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProps) {
-  const { settings } = useSettingsContext();
+  const { settings, loaded } = useSettings();
   const { state, fetchCollection, reset } = useCollection();
   const [credentials, setCredentials] = useState<import('../services').DiscogsCredentials | null>(null);
   const [search, setSearch] = useState('');
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
-  const effectiveSettings = settings ?? DEFAULT_SETTINGS;
+  const settingsKey = `${settings.formats.join(',')}|${settings.sort_by}|${settings.show_prices}`;
 
   useEffect(() => {
     getStoredCredentials().then(setCredentials);
   }, []);
 
   useEffect(() => {
-    if (credentials && state.status === 'idle') {
-      fetchCollection(credentials, { lpStrict: effectiveSettings.lpStrict });
+    if (credentials && loaded && state.status === 'idle') {
+      fetchCollection(credentials);
     }
-  }, [credentials, state.status, fetchCollection, effectiveSettings.lpStrict]);
+  }, [credentials, loaded, state.status, fetchCollection]);
 
-  const prevLpStrict = useRef<boolean | null>(null);
+  const prevSettingsKey = useRef<string | null>(null);
   const hasFetched = useRef(false);
   useEffect(() => {
     if (state.status === 'success') hasFetched.current = true;
@@ -99,15 +99,14 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
   useEffect(() => {
     if (
       hasFetched.current &&
-      prevLpStrict.current !== null &&
-      prevLpStrict.current !== effectiveSettings.lpStrict &&
+      prevSettingsKey.current !== null &&
+      prevSettingsKey.current !== settingsKey &&
       credentials
     ) {
-      prevLpStrict.current = effectiveSettings.lpStrict;
       reset();
     }
-    prevLpStrict.current = effectiveSettings.lpStrict;
-  }, [effectiveSettings.lpStrict, credentials, reset]);
+    prevSettingsKey.current = settingsKey;
+  }, [settingsKey, credentials, reset]);
 
   const handleSignOut = useCallback(async () => {
     await clearStoredCredentials();
@@ -135,14 +134,13 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
     if (state.status !== 'success') return [];
     return sortRows(
       state.rows,
-      effectiveSettings.variousPolicy,
-      effectiveSettings.sortBy
+      GUI_BUILD_SORT.variousPolicy,
+      settings.sort_by
     );
   }, [
     state.status,
     state.status === 'success' ? state.rows : [],
-    effectiveSettings.variousPolicy,
-    effectiveSettings.sortBy,
+    settings.sort_by,
   ]);
 
   const filteredRows =
@@ -159,10 +157,10 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
         : [];
 
   const sections = useMemo(() => {
-    if (!effectiveSettings.showDividers || filteredRows.length === 0) return [];
+    if (settings.divider_mode === 'none' || filteredRows.length === 0) return [];
     const map = new Map<string, ReleaseRow[]>();
     for (const row of filteredRows) {
-      const letter = getSectionLetter(row, effectiveSettings.sortBy);
+      const letter = getSectionLetter(row, settings.sort_by);
       const list = map.get(letter) ?? [];
       list.push(row);
       map.set(letter, list);
@@ -177,7 +175,7 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
       return a.localeCompare(b);
     });
     return keys.map((title) => ({ title, data: map.get(title) ?? [] }));
-  }, [filteredRows, effectiveSettings.showDividers, effectiveSettings.sortBy]);
+  }, [filteredRows, settings.divider_mode, settings.sort_by]);
 
   if (state.status === 'loading') {
     return (

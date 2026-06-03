@@ -13,7 +13,7 @@ import { AuthScreen } from './src/screens/AuthScreen';
 import { AlbumDetailScreen } from './src/screens/AlbumDetailScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { MainTabs } from './src/navigation/MainTabs';
-import { SettingsProvider } from './src/contexts/SettingsContext';
+import { SettingsProvider } from './src/context/SettingsContext';
 import { hasStoredCredentials } from './src/services';
 
 const Stack = createNativeStackNavigator();
@@ -70,10 +70,14 @@ export default function App() {
                   name="AlbumDetail"
                   component={AlbumDetailScreen}
                 />
-                <Stack.Screen
-                  name="Settings"
-                  component={SettingsScreen}
-                />
+                <Stack.Screen name="Settings">
+                  {() => (
+                    <SettingsScreen
+                      onSignOut={handleSignOut}
+                      onSettingsChanged={() => {}}
+                    />
+                  )}
+                </Stack.Screen>
               </>
             )}
           </Stack.Navigator>

@@ -1,182 +1,148 @@
 /**
- * Discogs OAuth 1.0a flow.
- * Uses request_token → authorize → access_token with callback via deep link.
+ * Discogs OAuth 1.0a for mobile (discogvinylsorter://callback).
  */
 
-import OAuth from 'oauth-1.0a';
-import CryptoJS from 'crypto-js';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import OAuth from 'oauth-1.0a';
+import CryptoJS from 'crypto-js';
+import { DISCOGS_CONSUMER_KEY, DISCOGS_CONSUMER_SECRET } from '@env';
+
+WebBrowser.maybeCompleteAuthSession();
 
 const API_BASE = 'https://api.discogs.com';
-const AUTH_BASE = 'https://www.discogs.com';
-const USER_AGENT = 'DiscogsVinylSorter/1.0 (https://github.com/discogs-vinyl-sorter-mobile)';
-
-export interface OAuthTokens {
-  token: string;
-  secret: string;
-}
-
-/** HMAC-SHA1 for OAuth 1.0a using crypto-js (React Native compatible). */
-function hmacSha1Base64(message: string, key: string): string {
-  const hash = CryptoJS.HmacSHA1(message, key);
-  return CryptoJS.enc.Base64.stringify(hash);
-}
+const OAUTH_REQUEST_URL = `${API_BASE}/oauth/request_token`;
+const OAUTH_ACCESS_URL = `${API_BASE}/oauth/access_token`;
+const OAUTH_AUTHORIZE_URL = 'https://www.discogs.com/oauth/authorize';
+const CALLBACK_URL = 'discogvinylsorter://callback';
+const USER_AGENT =
+  'DiscogsVinylSorter/1.0 (https://github.com/discogs-vinyl-sorter-mobile)';
 
 function createOAuth(consumerKey: string, consumerSecret: string) {
   return new OAuth({
     consumer: { key: consumerKey, secret: consumerSecret },
     signature_method: 'HMAC-SHA1',
-    hash_function(baseString: string, key: string) {
-      return hmacSha1Base64(baseString, key);
+    hash_function(baseString, key) {
+      return CryptoJS.HmacSHA1(baseString, key).toString(CryptoJS.enc.Base64);
     },
   });
 }
 
-/** Get request token and build authorize URL. Discogs uses GET for request_token. */
-async function getRequestToken(
-  consumerKey: string,
-  consumerSecret: string,
-  callbackUrl: string
-): Promise<{ oauthToken: string; oauthTokenSecret: string; authorizeUrl: string }> {
-  const oauth = createOAuth(consumerKey, consumerSecret);
-  const requestData = {
-    url: `${API_BASE}/oauth/request_token`,
-    method: 'GET' as const,
-    data: { oauth_callback: callbackUrl },
-  };
-  const authHeader = oauth.toHeader(oauth.authorize(requestData));
-
-  const response = await fetch(`${API_BASE}/oauth/request_token`, {
-    method: 'GET',
-    headers: {
-      Authorization: authHeader.Authorization,
-      'User-Agent': USER_AGENT,
-    },
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Discogs request token failed: ${response.status} – ${text}`);
-  }
-
-  const text = await response.text();
-  const params = new URLSearchParams(text);
-  const oauthToken = params.get('oauth_token');
-  const oauthTokenSecret = params.get('oauth_token_secret');
-
-  if (!oauthToken || !oauthTokenSecret) {
-    throw new Error('Invalid Discogs response: missing token');
-  }
-
-  const authorizeUrl = `${AUTH_BASE}/oauth/authorize?oauth_token=${encodeURIComponent(oauthToken)}`;
-  return { oauthToken, oauthTokenSecret, authorizeUrl };
+export function getConsumerCredentials(): { key: string; secret: string } | null {
+  const key = (DISCOGS_CONSUMER_KEY || '').trim();
+  const secret = (DISCOGS_CONSUMER_SECRET || '').trim();
+  if (key && secret) return { key, secret };
+  return null;
 }
 
-/** Exchange verifier for access token. */
-async function getAccessToken(
+export function isOAuthConfigured(): boolean {
+  return getConsumerCredentials() !== null;
+}
+
+async function oauthPost(
+  url: string,
   consumerKey: string,
   consumerSecret: string,
-  requestToken: string,
-  requestTokenSecret: string,
-  oauthVerifier: string
-): Promise<OAuthTokens> {
+  token?: { key: string; secret: string },
+  extra?: Record<string, string>
+): Promise<string> {
   const oauth = createOAuth(consumerKey, consumerSecret);
-  const requestData = {
-    url: `${API_BASE}/oauth/access_token`,
-    method: 'POST',
-    data: {
-      oauth_token: requestToken,
-      oauth_verifier: oauthVerifier,
-    },
-  };
-  const authHeader = oauth.toHeader(
-    oauth.authorize(requestData, {
-      key: requestToken,
-      secret: requestTokenSecret,
-    })
-  );
-
-  const body = new URLSearchParams({
-    oauth_token: requestToken,
-    oauth_verifier: oauthVerifier,
-  }).toString();
-
-  const response = await fetch(`${API_BASE}/oauth/access_token`, {
+  const requestData = { url, method: 'POST' as const, data: extra };
+  const authHeader = oauth.toHeader(oauth.authorize(requestData, token));
+  const body = extra ? new URLSearchParams(extra).toString() : undefined;
+  const resp = await fetch(url, {
     method: 'POST',
     headers: {
-      Authorization: authHeader.Authorization,
+      ...authHeader,
       'User-Agent': USER_AGENT,
-      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
+      ...(body ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
     },
     body,
   });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Discogs access token failed: ${response.status} – ${text}`);
-  }
-
-  const resText = await response.text();
-  const params = new URLSearchParams(resText);
-  const token = params.get('oauth_token');
-  const secret = params.get('oauth_token_secret');
-
-  if (!token || !secret) {
-    throw new Error('Invalid Discogs response: missing access token');
-  }
-
-  return { token, secret };
+  return resp.text();
 }
 
-/**
- * Run the full OAuth flow: open browser, user authorizes, return access tokens.
- * Uses WebBrowser.openAuthSessionAsync to capture the redirect.
- */
-export async function runDiscogsOAuthFlow(
-  consumerKey: string,
-  consumerSecret: string
-): Promise<OAuthTokens> {
-  const scheme = 'discogvinylsorter';
-  const callbackPath = '/oauth/callback';
-  const callbackUrl = `${scheme}://${callbackPath}`;
+function parseOAuthResponse(text: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const part of text.split('&')) {
+    const [k, v] = part.split('=');
+    if (k) out[decodeURIComponent(k)] = decodeURIComponent(v || '');
+  }
+  return out;
+}
 
-  const { oauthToken, oauthTokenSecret, authorizeUrl } = await getRequestToken(
-    consumerKey,
-    consumerSecret,
-    callbackUrl
-  );
+export async function runOAuthFlow(): Promise<{
+  accessToken: string;
+  accessSecret: string;
+}> {
+  const creds = getConsumerCredentials();
+  if (!creds) {
+    throw new Error(
+      'OAuth is not configured. Add DISCOGS_CONSUMER_KEY and DISCOGS_CONSUMER_SECRET to .env, or use a Personal Access Token.'
+    );
+  }
 
-  const result = await WebBrowser.openAuthSessionAsync(
-    authorizeUrl,
-    callbackUrl
+  const reqText = await oauthPost(
+    OAUTH_REQUEST_URL,
+    creds.key,
+    creds.secret,
+    undefined,
+    { oauth_callback: CALLBACK_URL }
   );
+  const reqTokens = parseOAuthResponse(reqText);
+  const requestToken = reqTokens.oauth_token;
+  const requestTokenSecret = reqTokens.oauth_token_secret;
+  if (!requestToken || !requestTokenSecret) {
+    throw new Error(`OAuth request token failed: ${reqText}`);
+  }
+
+  const authUrl = `${OAUTH_AUTHORIZE_URL}?oauth_token=${encodeURIComponent(requestToken)}`;
+  const result = await WebBrowser.openAuthSessionAsync(authUrl, CALLBACK_URL);
 
   if (result.type !== 'success' || !result.url) {
-    throw new Error('OAuth was cancelled or failed');
+    throw new Error('OAuth cancelled or failed');
   }
 
-  const url = result.url;
-  const queryIndex = url.indexOf('?');
-  const searchParams = new URLSearchParams(
-    queryIndex >= 0 ? url.substring(queryIndex) : ''
+  const parsed = Linking.parse(result.url);
+  const verifierRaw = parsed.queryParams?.oauth_verifier;
+  const verifier = Array.isArray(verifierRaw)
+    ? verifierRaw[0]
+    : (verifierRaw as string | undefined);
+  if (!verifier) {
+    throw new Error('OAuth: no verifier in callback');
+  }
+
+  const accessText = await oauthPost(
+    OAUTH_ACCESS_URL,
+    creds.key,
+    creds.secret,
+    { key: requestToken, secret: requestTokenSecret },
+    { oauth_verifier: verifier }
   );
-  const oauthVerifier = searchParams.get('oauth_verifier');
-  const returnedToken = searchParams.get('oauth_token');
-
-  if (!oauthVerifier || !returnedToken) {
-    throw new Error('OAuth callback missing verifier or token');
+  const accessTokens = parseOAuthResponse(accessText);
+  const accessToken = accessTokens.oauth_token;
+  const accessSecret = accessTokens.oauth_token_secret;
+  if (!accessToken || !accessSecret) {
+    throw new Error(`OAuth access token failed: ${accessText}`);
   }
 
-  if (returnedToken !== oauthToken) {
-    throw new Error('OAuth token mismatch');
-  }
+  return { accessToken, accessSecret };
+}
 
-  return getAccessToken(
-    consumerKey,
-    consumerSecret,
-    oauthToken,
-    oauthTokenSecret,
-    oauthVerifier
+export function getOAuthAuthHeader(
+  url: string,
+  method: 'GET' | 'POST',
+  consumerKey: string,
+  consumerSecret: string,
+  accessToken: string,
+  accessSecret: string
+): Record<string, string> {
+  const oauth = createOAuth(consumerKey, consumerSecret);
+  return oauth.toHeader(
+    oauth.authorize(
+      { url, method },
+      { key: accessToken, secret: accessSecret }
+    )
   );
 }

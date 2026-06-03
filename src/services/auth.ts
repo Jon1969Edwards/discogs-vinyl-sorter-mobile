@@ -150,6 +150,11 @@ export async function hasStoredCredentials(): Promise<boolean> {
   return cred !== null;
 }
 
+/** Clear all stored credentials (parity alias). */
+export async function clearAllAuth(): Promise<void> {
+  await clearStoredCredentials();
+}
+
 // ---------------------------------------------------------------------------
 // Legacy API – for backward compatibility, maps to credentials
 // ---------------------------------------------------------------------------

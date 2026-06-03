@@ -5,7 +5,9 @@
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import type { ReleaseRow } from '../types';
-import { generateTxt, generateCsv, generateJson } from '../utils/export';
+import type { DividerMode } from '../types';
+import { generateTxt, generateCsv, generateJson } from '../domain/export';
+import { loadSettings } from './settings';
 
 export type ExportFormat = 'txt' | 'csv' | 'json';
 
@@ -18,14 +20,24 @@ const FILENAMES: Record<ExportFormat, string> = {
 export async function exportAndShare(
   rows: ReleaseRow[],
   format: ExportFormat,
-  dividers = false
+  options?: {
+    dividerMode?: DividerMode;
+    showPrice?: boolean;
+  }
 ): Promise<void> {
+  const settings = await loadSettings();
+  const dividerMode = options?.dividerMode ?? settings.divider_mode;
+  const showPrice = options?.showPrice ?? settings.show_prices;
+
   const filename = FILENAMES[format];
   let content: string;
 
   switch (format) {
     case 'txt':
-      content = generateTxt(rows, dividers);
+      content = generateTxt(rows, {
+        dividerMode,
+        showPrice,
+      });
       break;
     case 'csv':
       content = generateCsv(rows);

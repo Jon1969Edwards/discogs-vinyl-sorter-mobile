@@ -338,6 +338,42 @@ export async function* iterateWantlist(
   }
 }
 
+export async function getCollectionCount(
+  client: AxiosInstance,
+  username: string
+): Promise<number> {
+  const data = await apiGet<DiscogsCollectionResponse>(
+    client,
+    `/users/${username}/collection/folders/0/releases`,
+    { page: '1', per_page: '1' }
+  );
+  return data.pagination?.items ?? 0;
+}
+
+export async function attachPricesToRows(
+  client: AxiosInstance,
+  rows: import('../types').ReleaseRow[],
+  currency: string,
+  onProgress?: (done: number, total: number) => void
+): Promise<void> {
+  const withIds = rows.filter((r) => r.release_id != null);
+  const total = withIds.length;
+  let done = 0;
+
+  for (const row of withIds) {
+    const stats = await fetchMarketplaceStats(
+      client,
+      row.release_id!,
+      currency
+    );
+    row.lowest_price = stats.lowestPrice;
+    row.num_for_sale = stats.numForSale;
+    row.price_currency = stats.currency;
+    done += 1;
+    onProgress?.(done, total);
+  }
+}
+
 export async function fetchMarketplaceStats(
   client: AxiosInstance,
   releaseId: number,
