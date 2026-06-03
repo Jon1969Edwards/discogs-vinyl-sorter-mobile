@@ -10,15 +10,36 @@ const { spawn, spawnSync } = require('child_process');
 const projectRoot = path.resolve(__dirname, '..');
 const localPropsPath = path.join(projectRoot, 'android', 'local.properties');
 
-let sdkDir = process.env.ANDROID_HOME;
+function defaultSdkDir() {
+  const home = process.env.USERPROFILE || process.env.HOME || '';
+  if (process.platform === 'win32') {
+    return path.join(home, 'AppData', 'Local', 'Android', 'Sdk');
+  }
+  if (process.platform === 'darwin') {
+    return path.join(home, 'Library', 'Android', 'sdk');
+  }
+  return path.join(home, 'Android', 'Sdk');
+}
+
+let sdkDir = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT;
 if (!sdkDir && fs.existsSync(localPropsPath)) {
   const content = fs.readFileSync(localPropsPath, 'utf8');
   const match = content.match(/sdk\.dir=(.+)/);
-  if (match) sdkDir = match[1].trim().replace(/\\/g, '/');
+  if (match) {
+    sdkDir = match[1]
+      .trim()
+      .replace(/\\\\/g, path.sep)
+      .replace(/\\/g, path.sep);
+  }
+}
+if (!sdkDir || !fs.existsSync(sdkDir)) {
+  const fallback = defaultSdkDir();
+  if (fs.existsSync(fallback)) sdkDir = fallback;
 }
 
 if (!sdkDir || !fs.existsSync(sdkDir)) {
   console.error('Android SDK not found. Create android/local.properties with sdk.dir=...');
+  console.error('  Example: copy android/local.properties.example → android/local.properties');
   process.exit(1);
 }
 
