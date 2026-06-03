@@ -30,8 +30,11 @@ npm start
 ```
 
 4. **Run on device/emulator** (this project uses a **development build**, not Expo Go):
-   - First time / after native dependency changes: `npm run android` (builds and installs the dev client)
-   - Day-to-day JS reload: `npm start`, then open the **Discogs Vinyl Sorter** dev app on the device (not Expo Go)
+   - **SDK path:** copy `android/local.properties.example` → `android/local.properties` (or rely on default `%LOCALAPPDATA%\Android\Sdk`)
+   - **Emulator:** `npm run android:emulator` → wait for the home screen → `npm run android`
+   - **USB phone:** enable USB debugging, connect, then `npm run android` (skips emulator)
+   - First build: `npm run android` (may auto-start an AVD; cold boot can take 5+ minutes on Windows)
+   - Day-to-day JS: `npm start`, then open the **Discogs Vinyl Sorter** dev app (not Expo Go)
 
 If you see `RNGestureHandlerModule could not be found`, you opened the bundle in **Expo Go** or an outdated APK — run `npm run android` once, then use `npm start` and the dev client app.
 

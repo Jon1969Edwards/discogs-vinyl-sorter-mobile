@@ -1,58 +1,28 @@
 #!/usr/bin/env node
 /**
  * Runs expo run:android with ANDROID_HOME set from local.properties.
- * Resets ADB to fix "device offline", waits for emulator if needed.
+ * Waits for emulator boot (boot_completed) or uses an already-connected device/USB phone.
  */
 const path = require('path');
 const fs = require('fs');
 const { spawn, spawnSync } = require('child_process');
+const {
+  resolveSdkDir,
+  sdkTools,
+  prependSdkToPath,
+} = require('./android-sdk');
 
 const projectRoot = path.resolve(__dirname, '..');
-const localPropsPath = path.join(projectRoot, 'android', 'local.properties');
+const sdkDir = resolveSdkDir(projectRoot);
 
-function defaultSdkDir() {
-  const home = process.env.USERPROFILE || process.env.HOME || '';
-  if (process.platform === 'win32') {
-    return path.join(home, 'AppData', 'Local', 'Android', 'Sdk');
-  }
-  if (process.platform === 'darwin') {
-    return path.join(home, 'Library', 'Android', 'sdk');
-  }
-  return path.join(home, 'Android', 'Sdk');
-}
-
-let sdkDir = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT;
-if (!sdkDir && fs.existsSync(localPropsPath)) {
-  const content = fs.readFileSync(localPropsPath, 'utf8');
-  const match = content.match(/sdk\.dir=(.+)/);
-  if (match) {
-    sdkDir = match[1]
-      .trim()
-      .replace(/\\\\/g, path.sep)
-      .replace(/\\/g, path.sep);
-  }
-}
-if (!sdkDir || !fs.existsSync(sdkDir)) {
-  const fallback = defaultSdkDir();
-  if (fs.existsSync(fallback)) sdkDir = fallback;
-}
-
-if (!sdkDir || !fs.existsSync(sdkDir)) {
+if (!sdkDir) {
   console.error('Android SDK not found. Create android/local.properties with sdk.dir=...');
   console.error('  Example: copy android/local.properties.example → android/local.properties');
   process.exit(1);
 }
 
-process.env.ANDROID_HOME = sdkDir;
-const pathSep = process.platform === 'win32' ? ';' : ':';
-process.env.PATH = [
-  path.join(sdkDir, 'platform-tools'),
-  path.join(sdkDir, 'emulator'),
-  process.env.PATH,
-].join(pathSep);
-
-const adb = path.join(sdkDir, 'platform-tools', process.platform === 'win32' ? 'adb.exe' : 'adb');
-const emulator = path.join(sdkDir, 'emulator', process.platform === 'win32' ? 'emulator.exe' : 'emulator');
+prependSdkToPath(sdkDir);
+const { adb, emulator } = sdkTools(sdkDir);
 
 function resetAdb() {
   spawnSync(adb, ['kill-server'], { stdio: 'pipe' });
@@ -73,69 +43,121 @@ function listAvds() {
   return (result.stdout || '').trim().split('\n').filter(Boolean);
 }
 
-(async () => {
-  // Reset ADB first - fixes "device offline" from stale connections
-  resetAdb();
-  await new Promise((r) => setTimeout(r, 3000));
+function isBootCompleted() {
+  const r = spawnSync(adb, ['shell', 'getprop', 'sys.boot_completed'], {
+    encoding: 'utf8',
+    timeout: 15000,
+  });
+  return (r.stdout || '').trim() === '1';
+}
 
-  let devices = getReadyDevices();
-  if (devices.length > 0) {
-    const device = devices[0];
-    console.log(`Using device: ${device}\n`);
-    const expoCli = path.join(projectRoot, 'node_modules', 'expo', 'bin', 'cli');
-    const child = spawn(process.execPath, [expoCli, 'run:android'], {
-      cwd: projectRoot,
-      stdio: 'inherit',
-      shell: false,
-      env: { ...process.env, ANDROID_HOME: sdkDir },
-    });
-    child.on('exit', (code) => process.exit(code ?? 0));
-    return;
+async function waitForEmulatorReady(maxMs) {
+  const pollMs = 4000;
+  const start = Date.now();
+  let sawDevice = false;
+
+  while (Date.now() - start < maxMs) {
+    const devices = getReadyDevices();
+    if (devices.length > 0) {
+      sawDevice = true;
+      if (isBootCompleted()) return devices[0];
+    } else if (sawDevice) {
+      // Device vanished — keep polling
+      sawDevice = false;
+    }
+    process.stdout.write('.');
+    await new Promise((r) => setTimeout(r, pollMs));
   }
+  return null;
+}
 
-  // No device - kill any stuck emulator, then cold boot a fresh one
-  spawnSync(adb, ['emu', 'kill'], { stdio: 'pipe' });
+function runExpoAndroid() {
+  const expoCli = path.join(projectRoot, 'node_modules', 'expo', 'bin', 'cli');
+  const child = spawn(process.execPath, [expoCli, 'run:android'], {
+    cwd: projectRoot,
+    stdio: 'inherit',
+    shell: false,
+    env: { ...process.env, ANDROID_HOME: sdkDir },
+  });
+  child.on('exit', (code) => process.exit(code ?? 0));
+}
+
+function startEmulator(avd) {
+  const coldBoot = process.env.COLD_BOOT === '1';
+  const args = ['-avd', avd, '-no-boot-anim'];
+  if (coldBoot) args.push('-no-snapshot-load');
+  // Software GPU is more reliable on Windows when HW acceleration fails silently.
+  if (process.platform === 'win32') args.push('-gpu', 'swiftshader_indirect');
+
+  const logDir = path.join(projectRoot, 'android');
+  const logFile = path.join(logDir, 'emulator-last.log');
+  const out = fs.openSync(logFile, 'a');
+  fs.writeSync(out, `\n--- ${new Date().toISOString()} starting ${avd} ---\n`);
+
+  const child = spawn(emulator, args, {
+    detached: true,
+    stdio: ['ignore', out, out],
+  });
+  child.unref();
+  return logFile;
+}
+
+(async () => {
   resetAdb();
   await new Promise((r) => setTimeout(r, 2000));
 
+  let devices = getReadyDevices();
+  if (devices.length > 0) {
+    console.log(`Using device: ${devices[0]}\n`);
+    if (!isBootCompleted()) {
+      console.log('Waiting for device to finish booting...');
+      const ready = await waitForEmulatorReady(120000);
+      if (!ready) {
+        console.error('Device connected but Android did not finish booting.');
+        process.exit(1);
+      }
+    }
+    runExpoAndroid();
+    return;
+  }
+
   const avds = listAvds();
-  const avd = avds.find((a) => a.includes('Medium_Phone')) || avds[0];
+  const avd =
+    process.env.ANDROID_AVD ||
+    avds.find((a) => a.includes('Medium_Phone')) ||
+    avds[0];
+
   if (!avd) {
     console.error('No AVD found. Create one in Android Studio → Device Manager.');
     process.exit(1);
   }
 
-  console.log('No device connected. Cold-booting emulator (this may take 2–3 min)...');
-  spawn(emulator, ['-avd', avd, '-no-snapshot-load'], { detached: true, stdio: 'ignore' }).unref();
+  console.log('No device connected. Starting emulator...');
+  console.log(`  AVD: ${avd}`);
+  console.log('  Tip: set ANDROID_AVD=Pixel_9a to pick another AVD');
+  console.log('  Tip: plug in a USB phone (USB debugging) and re-run to skip the emulator\n');
 
-  const maxWait = 180000; // 3 minutes
-  const pollInterval = 5000;
-  const start = Date.now();
+  spawnSync(adb, ['emu', 'kill'], { stdio: 'pipe' });
+  await new Promise((r) => setTimeout(r, 1500));
 
-  while (Date.now() - start < maxWait) {
-    process.stdout.write('.');
-    await new Promise((r) => setTimeout(r, pollInterval));
-    devices = getReadyDevices();
-    if (devices.length > 0) {
-      const device = devices[0];
-      console.log(`\nEmulator ready: ${device}`);
-      // Brief pause for device to stabilize before Expo queries it
-      await new Promise((r) => setTimeout(r, 5000));
-      const expoCli = path.join(projectRoot, 'node_modules', 'expo', 'bin', 'cli');
-      const child = spawn(process.execPath, [expoCli, 'run:android'], {
-        cwd: projectRoot,
-        stdio: 'inherit',
-        shell: false,
-        env: { ...process.env, ANDROID_HOME: sdkDir },
-      });
-      child.on('exit', (code) => process.exit(code ?? 0));
-      return;
-    }
+  const logFile = startEmulator(avd);
+  const maxWait = Number(process.env.EMULATOR_BOOT_TIMEOUT_MS) || 360000; // 6 min
+  console.log(`Booting (up to ${Math.round(maxWait / 60000)} min; dots = still waiting)...`);
+
+  const deviceId = await waitForEmulatorReady(maxWait);
+  if (!deviceId) {
+    console.error('\nEmulator did not become ready in time.');
+    console.error(`  Log: ${logFile}`);
+    console.error('\nTry:');
+    console.error('  1. npm run android:emulator   (wait for home screen in the emulator window)');
+    console.error('  2. npm run android');
+    console.error('  Or: Android Studio → Device Manager → run the AVD manually, then npm run android');
+    console.error('  Or: USB phone with Developer options → USB debugging enabled');
+    console.error('  Slow PC cold boot: set COLD_BOOT=1 only when needed; default uses snapshots (faster)');
+    process.exit(1);
   }
 
-  console.error('\nEmulator failed to start in time.');
-  console.error('1. Close any open emulator window');
-  console.error('2. Run: npm run android:emulator');
-  console.error('3. Wait until the home screen appears, then run: npm run android');
-  process.exit(1);
+  console.log(`\nEmulator ready: ${deviceId}`);
+  await new Promise((r) => setTimeout(r, 3000));
+  runExpoAndroid();
 })();
