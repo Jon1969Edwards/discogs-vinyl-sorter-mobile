@@ -29,7 +29,11 @@ npm install
 npm start
 ```
 
-4. Scan the QR code with Expo Go (Android) or the Camera app (iOS).
+4. **Run on device/emulator** (this project uses a **development build**, not Expo Go):
+   - First time / after native dependency changes: `npm run android` (builds and installs the dev client)
+   - Day-to-day JS reload: `npm start`, then open the **Discogs Vinyl Sorter** dev app on the device (not Expo Go)
+
+If you see `RNGestureHandlerModule could not be found`, you opened the bundle in **Expo Go** or an outdated APK — run `npm run android` once, then use `npm start` and the dev client app.
 
 ## Project Structure
 

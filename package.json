@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "index.ts",
   "scripts": {
-    "start": "expo start",
+    "start": "expo start --dev-client",
+    "postinstall": "node scripts/fix-nested-deps.js",
     "android": "node scripts/run-android.js",
     "android:emulator": "node scripts/start-emulator.js",
     "ios": "expo run:ios",

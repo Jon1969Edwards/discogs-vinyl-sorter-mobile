@@ -164,8 +164,8 @@ Windows sibling doc (optional): `discogs-vinyl-sorter-windows/docs/MOBILE_PARITY
 | Topic | Detail |
 |-------|--------|
 | **Reanimated 4** | Requires `react-native-worklets@0.5.1` (Expo Go match), `babel-preset-expo@~54`, and `import 'react-native-reanimated'` in `index.ts` |
-| **Expo Go** | Fine for PAT + collection smoke tests |
-| **Dev client** | `expo-dev-client` + `npm run android` for full native OAuth / linking |
+| **Expo Go** | **Not supported** for this repo (`expo-dev-client` + gesture-handler / reanimated). Use dev client only. |
+| **Dev client** | `npm run android` (first time / after native deps), then `npm start` (`--dev-client`) and open the **Discogs Vinyl Sorter** app — not Expo Go |
 | **Sort order** | Last-name-first matches Windows GUI (e.g. Bryan Adams before Alphaville by shelf letter) — not a bug |
 
 ---

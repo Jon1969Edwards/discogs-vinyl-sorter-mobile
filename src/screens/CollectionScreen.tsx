@@ -15,11 +15,8 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import DraggableFlatList, {
-  ScaleDecorator,
-  type RenderItemParams,
-} from 'react-native-draggable-flatlist';
 import type { ReleaseRow } from '../types';
+import type { ManualReorderListProps } from '../components/ManualReorderList';
 import { useCollection } from '../hooks/useCollection';
 import { useCollectionWatch } from '../hooks/useCollectionWatch';
 import { useSettings } from '../context/SettingsContext';
@@ -56,30 +53,37 @@ function rowKey(item: ReleaseRow, index: number): string {
   return `row-${index}`;
 }
 
+function ReorderListLoader(props: ManualReorderListProps) {
+  const [List, setList] = useState<React.ComponentType<ManualReorderListProps> | null>(
+    null
+  );
+
+  useEffect(() => {
+    import('../components/ManualReorderList').then((m) => {
+      setList(() => m.ManualReorderList);
+    });
+  }, []);
+
+  if (!List) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#e94560" />
+      </View>
+    );
+  }
+
+  return <List {...props} />;
+}
+
 function AlbumRow({
   item,
   onPress,
-  drag,
-  reorderMode,
 }: {
   item: ReleaseRow;
   onPress: () => void;
-  drag?: () => void;
-  reorderMode?: boolean;
 }) {
   return (
-    <TouchableOpacity
-      style={[styles.row, reorderMode && styles.rowReorder]}
-      onPress={reorderMode ? undefined : onPress}
-      onLongPress={reorderMode ? drag : undefined}
-      delayLongPress={reorderMode ? 120 : undefined}
-      activeOpacity={0.7}
-    >
-      {reorderMode ? (
-        <Text style={styles.dragHandle} accessibilityLabel="Drag to reorder">
-          ≡
-        </Text>
-      ) : null}
+    <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
       {item.thumb_url ? (
         <Image source={{ uri: item.thumb_url }} style={styles.thumb} />
       ) : (
@@ -256,20 +260,6 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
     reset();
   }, [reset]);
 
-  const renderDraggableItem = useCallback(
-    ({ item, drag, isActive }: RenderItemParams<ReleaseRow>) => (
-      <ScaleDecorator activeScale={1.02}>
-        <AlbumRow
-          item={item}
-          onPress={() => navigation.navigate('AlbumDetail', { release: item })}
-          drag={drag}
-          reorderMode
-        />
-      </ScaleDecorator>
-    ),
-    [navigation]
-  );
-
   if (state.status === 'loading') {
     return (
       <View style={styles.center}>
@@ -407,15 +397,7 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
       ) : null}
 
       {reorderMode ? (
-        <DraggableFlatList
-          data={reorderRows}
-          onDragEnd={({ data }) => setReorderRows(data)}
-          keyExtractor={(item, index) => rowKey(item, index)}
-          renderItem={renderDraggableItem}
-          ListEmptyComponent={
-            <Text style={styles.empty}>No LPs in collection</Text>
-          }
-        />
+        <ReorderListLoader rows={reorderRows} onRowsChange={setReorderRows} />
       ) : showDividers && sections.length > 0 && Platform.OS !== 'web' ? (
         <SectionList
           sections={sections}
@@ -583,17 +565,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#252542',
-  },
-  rowReorder: {
-    backgroundColor: '#222240',
-  },
-  dragHandle: {
-    width: 28,
-    fontSize: 22,
-    color: '#888',
-    textAlign: 'center',
-    alignSelf: 'center',
-    marginRight: 4,
   },
   thumb: {
     width: 48,
