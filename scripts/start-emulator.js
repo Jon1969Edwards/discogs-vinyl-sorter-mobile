@@ -42,7 +42,10 @@ const abi = readAvdAbi(avd);
 const coldBoot = process.env.COLD_BOOT === '1';
 const args = ['-avd', avd];
 if (coldBoot) args.push('-no-snapshot-load');
-if (process.platform === 'win32') args.push('-gpu', 'swiftshader_indirect');
+if (process.platform === 'win32') {
+  args.push('-gpu', 'swiftshader_indirect');
+  if (process.env.ACCEL_OFF === '1') args.push('-accel', 'off');
+}
 
 console.log(`Starting emulator: ${avd}${abi ? ` (${abi})` : ''}${coldBoot ? ' (cold boot)' : ''}`);
 console.log('Wait until the Android home screen appears, then run: npm run android\n');

@@ -84,8 +84,11 @@ function startEmulator(avd) {
   const coldBoot = process.env.COLD_BOOT === '1';
   const args = ['-avd', avd, '-no-boot-anim'];
   if (coldBoot) args.push('-no-snapshot-load');
-  // Software GPU is more reliable on Windows when HW acceleration fails silently.
-  if (process.platform === 'win32') args.push('-gpu', 'swiftshader_indirect');
+  // Software GPU + optional no-HW-accel when AEHD/HAXM hypervisor install failed (common on Windows).
+  if (process.platform === 'win32') {
+    args.push('-gpu', 'swiftshader_indirect');
+    if (process.env.ACCEL_OFF === '1') args.push('-accel', 'off');
+  }
 
   const logDir = path.join(projectRoot, 'android');
   const logFile = path.join(logDir, 'emulator-last.log');

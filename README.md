@@ -38,6 +38,8 @@ npm start
 
 If you see `RNGestureHandlerModule could not be found`, you opened the bundle in **Expo Go** or an outdated APK — run `npm run android` once, then use `npm start` and the dev client app.
 
+**Emulator / AEHD hypervisor failed on Windows?** See [docs/ANDROID_EMULATOR_WINDOWS.md](docs/ANDROID_EMULATOR_WINDOWS.md). Quick workaround: `$env:ACCEL_OFF="1"; npm run android:emulator` (slower), or use a USB phone with USB debugging.
+
 ## Project Structure
 
 ```
