@@ -1,27 +1,102 @@
-# Mobile–Windows Parity Handoff
+# Mobile app handoff summary
 
-## Repos and roles
-
-| Repo | Path | Role |
-|------|------|------|
-| **Windows (reference)** | `F:\Dev\discogs-vinyl-sorter-windows` | Source of truth: `core/` + Auto-Sort GUI (`autosort_gui.py`) |
-| **Mobile (port)** | `F:\Dev\discogs-vinyl-sorter-mobile` | Expo/React Native TypeScript port with Jest golden tests |
-
-**Parity target:** Windows **Auto-Sort GUI**, not CLI-only defaults.
-
-**Windows commit at handoff:** `43141fcaaa671d89de17126937e2ffcc5c3cb179` (`develop` / ABC dividers + sorting fixes)
+**Repo:** [Jon1969Edwards/discogs-vinyl-sorter-mobile](https://github.com/Jon1969Edwards/discogs-vinyl-sorter-mobile)  
+**Branch with parity work:** `develop` (merge into `develop`, not `main`)  
+**Latest parity merge:** `10d4bcf` — *Merge main into develop: Windows GUI parity on mobile*  
+**Parity implementation commit:** `1ff8f0d` — *Implement Windows GUI parity for collection, settings, and export*  
+**Windows reference commit:** `43141fcaaa671d89de17126937e2ffcc5c3cb179` (`discogs-vinyl-sorter-windows` / `develop`)
 
 ---
 
-## Parity contract (summary)
+## Executive summary
 
-1. **Collection pipeline:** Fetch all releases → tag `format_categories` → filter by saved `formats` (default `lp`) → sort with GUI build options (`lastNameFirst`, `lnfSafeBands`, `lnfAllow3=false`, `variousPolicy=normal`).
-2. **Export:** TXT/CSV/JSON matching Windows `core/export.py`; `divider_mode`: `none` | `letter` | `abc`.
-3. **Config keys** (AsyncStorage `discogs_app_settings`): `formats`, `divider_mode`, `sort_by`, `currency`, `write_json`, `poll_seconds`, `show_prices`, `user_agent`, `per_page`.
-4. **Auth:** PAT (validated via `/oauth/identity`) + OAuth 1.0a (`discogvinylsorter://callback`).
-5. **Wishlist:** Local storage + sync from Discogs wantlist on collection build.
-6. **Watch:** Foreground poll on collection item count (`poll_seconds`, default 300).
-7. **Prices:** Marketplace stats when `show_prices` or price sort; 7-day price cache TTL in collection cache service.
+The mobile app is an **Expo SDK 54** port of the **Windows Auto-Sort GUI** collection pipeline: fetch all releases from Discogs, classify formats, filter by user-selected formats (default LP), sort with the same last-name-first / GUI build rules as Windows, optionally attach marketplace prices, apply manual order overrides, cache results, and export TXT/CSV/JSON with letter or ABC shelf dividers.
+
+**Phases A–D are implemented** in code and covered by **19 Jest golden tests** ported from Windows. **Phase E (store/EAS polish)** is still open.
+
+Parity landed on **`develop`** together with pre-existing mobile work: **PAT + OAuth credentials** in SecureStore (web: `localStorage`), **custom Collection/Wishlist tabs**, **stack navigation** for Settings and album detail, and **Android dev-client scripts** (`npm run android`).
+
+---
+
+## Quick start (next developer)
+
+```bash
+cd F:\Dev\discogs-vinyl-sorter-mobile
+git checkout develop
+npm install
+npm test          # 19 tests — run after any domain change
+npm start         # Expo Go / dev client
+npm run android   # Local emulator via scripts/run-android.js
+```
+
+**Auth (pick one):**
+
+| Method | Setup |
+|--------|--------|
+| **PAT** | Auth screen → Advanced → paste token; validated via `getIdentity` before save |
+| **OAuth** | `.env` with `DISCOGS_CONSUMER_KEY` / `DISCOGS_CONSUMER_SECRET`; Discogs callback `discogvinylsorter://callback` — see `docs/OAUTH_SETUP.md` |
+
+**Publish parity to GitHub:**
+
+```bash
+git push origin develop
+```
+
+Local `main` was reset to `origin/main`; parity is **not** on `main` until you merge or cherry-pick from `develop`.
+
+---
+
+## App architecture (current `develop`)
+
+```mermaid
+flowchart TD
+  App[App.tsx]
+  Auth[AuthScreen]
+  Stack[Native stack navigator]
+  Tabs[MainTabs custom tabs]
+  Coll[CollectionScreen]
+  Wish[WishlistScreen]
+  Set[SettingsScreen stack]
+  Detail[AlbumDetailScreen stack]
+  Domain[src/domain sorting format export]
+  Hook[useCollection]
+  API[discogsApi + auth]
+
+  App --> Auth
+  App --> Stack
+  Stack --> Tabs
+  Stack --> Set
+  Stack --> Detail
+  Tabs --> Coll
+  Tabs --> Wish
+  Coll --> Hook
+  Hook --> Domain
+  Hook --> API
+  Set --> SettingsContext
+  Coll --> SettingsContext
+```
+
+| Layer | Location | Notes |
+|-------|----------|--------|
+| Entry | `index.ts` | Imports `react-native-gesture-handler` + `react-native-reanimated` first |
+| Settings (single source) | `src/context/SettingsContext.tsx` | `AppSettings` in AsyncStorage via `src/services/settings.ts` |
+| ~~Legacy~~ | ~~`src/contexts/SettingsContext.tsx`~~ | **Removed** — use `src/context/SettingsContext.tsx` only |
+| Collection pipeline | `src/hooks/useCollection.ts` | Windows GUI path: fetch-all → `collectAllRows` → format filter → prices → `sortRows` → `applyManualOrder` → cache |
+| Domain (tested) | `src/domain/*.ts` | Port of `core/sorting.py`, `format_filter.py`, `export.py` |
+| Auth | `src/services/auth.ts` | `DiscogsCredentials`: `{ type: 'pat' }` or `{ type: 'oauth', token, secret }` |
+
+**Navigation UX:** Collection and Wishlist share a **custom bottom tab bar** (`src/navigation/MainTabs.tsx`). **Settings** and **album detail** are **stack screens** pushed from Collection (not a third tab). This differs from the short-lived `main`-only bottom-tabs layout (Shelf | Wishlist | Settings).
+
+---
+
+## Parity contract (behavioral)
+
+1. **Collection:** Fetch all folder-0 releases → tag `format_categories` → filter by saved `formats` (default `['lp']`) → sort with GUI build options (`lastNameFirst`, `lnfSafeBands`, `lnfAllow3=false`, `variousPolicy=normal` from `GUI_BUILD_SORT` in `src/types/index.ts`).
+2. **Export:** TXT / CSV / JSON aligned with Windows `core/export.py`; `divider_mode`: `none` | `letter` | `abc`.
+3. **Config** (AsyncStorage key `discogs_app_settings`): `formats`, `divider_mode`, `sort_by`, `currency`, `write_json`, `poll_seconds`, `show_prices`, `user_agent`, `per_page`.
+4. **Wishlist:** Local entries + sync from Discogs wantlist during collection build (best-effort).
+5. **Cache:** Full row cache per username; collection item count for stale detection; 7-day price TTL in cache service.
+6. **Prices:** Marketplace stats when `show_prices` or price sort is active.
 
 ---
 
@@ -34,18 +109,20 @@
 | `core/export.py` | `src/domain/export.ts` |
 | `core/api.py` | `src/services/discogsApi.ts` |
 | `core/oauth_discogs.py` | `src/services/oauthDiscogs.ts` |
-| `core/build_service.py` (cache, count, build) | `src/services/collectionCache.ts`, `src/hooks/useCollection.ts` |
+| `core/build_service.py` (cache, count) | `src/services/collectionCache.ts`, `src/hooks/useCollection.ts` |
 | `autosort_gui.py` ManualOrderManager | `src/services/manualOrder.ts` |
-| `core/wishlist.py` / wantlist API | `src/services/wishlist.ts` |
+| `core/wishlist.py` | `src/services/wishlist.ts` |
 | `gui/settings_panel.py` | `src/screens/SettingsScreen.tsx` |
 | `gui/wishlist_panel.py` | `src/screens/WishlistScreen.tsx` |
 | `gui/thumbnails.py` | `src/services/thumbnailCache.ts` |
 | `.discogs_config.json` | AsyncStorage `discogs_app_settings` |
-| Secure token / OAuth | `expo-secure-store` (`src/services/auth.ts`) |
-| Export / print files | `src/services/exportShare.ts` (share sheet) |
+| Token / OAuth storage | `src/services/auth.ts` (SecureStore native, localStorage web) |
+| Export files | `src/services/exportShare.ts` (OS share sheet) |
 | `test_sorting.py` | `__tests__/sorting.test.ts` |
 | `test_format_filter.py` | `__tests__/formatFilter.test.ts` |
 | `test_export_dividers.py` | `__tests__/exportDividers.test.ts` |
+
+Windows sibling doc (optional): `discogs-vinyl-sorter-windows/docs/MOBILE_PARITY.md` → links here.
 
 ---
 
@@ -53,70 +130,69 @@
 
 ### Phase A — Domain + tests
 - [x] `src/domain/` sorting, formatFilter, export (ABC dividers)
-- [x] Jest golden tests from Windows
+- [x] Jest golden tests (19 passing)
 - [x] `useCollection` fetch-all → filter → GUI sort
 
 ### Phase B — Settings + auth
-- [x] Settings screen + AsyncStorage
-- [x] OAuth (`expo-web-browser` + `discogvinylsorter://callback`)
+- [x] Settings screen + AsyncStorage (`AppSettings`)
+- [x] OAuth (`expo-web-browser`, `discogvinylsorter://callback`)
 - [x] PAT validated with `getIdentity` before save
+- [x] Develop auth: PAT + OAuth credentials object (not token-only)
 
 ### Phase C — Collection UX
-- [x] Bottom tabs: Shelf | Wishlist | Settings
-- [x] Album detail modal + wishlist add/remove
-- [x] Manual reorder (`react-native-draggable-flatlist`)
-- [x] Prices in list when `show_prices`
-- [x] Thumbnail file cache
+- [x] Collection list + section dividers (letter mode)
+- [x] Stack album detail (`AlbumDetailScreen`)
+- [x] Export TXT/CSV/JSON from Collection
+- [x] Thumbnail cache service
+- [x] **UI:** Manual reorder (`react-native-draggable-flatlist`) in `CollectionScreen` (Reorder / Done / Reset)
+- [ ] **UI:** `AlbumDetailModal.tsx` present but unused (stack screen used instead)
 
 ### Phase D — Watch + cache
-- [x] Collection cache schema + item count
-- [x] Foreground poll (`useCollectionWatch`)
+- [x] Collection cache + item count
 - [x] Wishlist sync on build
+- [x] **UI:** `useCollectionWatch` mounted in `CollectionScreen` (poll + foreground resume)
 
-### Phase E — Release hardening (partial)
-- [ ] EAS Build profiles / store assets polish
-- [x] Handoff doc (this file)
-- [ ] Update `IMPLEMENTATION_PLAN.md` status matrix (optional follow-up)
+### Phase E — Release hardening
+- [ ] EAS Build profiles / store assets
+- [x] Handoff documentation (this file)
+- [x] README / `.env.example` callback URL aligned with `oauthDiscogs.ts` (`discogvinylsorter://callback`)
 
 ---
 
-## Known intentional differences
+## Expo / native notes
+
+| Topic | Detail |
+|-------|--------|
+| **Reanimated 4** | Requires `react-native-worklets@0.5.1` (Expo Go match), `babel-preset-expo@~54`, and `import 'react-native-reanimated'` in `index.ts` |
+| **Expo Go** | Fine for PAT + collection smoke tests |
+| **Dev client** | `expo-dev-client` + `npm run android` for full native OAuth / linking |
+| **Sort order** | Last-name-first matches Windows GUI (e.g. Bryan Adams before Alphaville by shelf letter) — not a bug |
+
+---
+
+## Known intentional differences (Windows vs mobile)
 
 | Windows | Mobile |
 |---------|--------|
-| Local `vinyl_shelf_order.txt` | System share sheet via `expo-sharing` |
+| `vinyl_shelf_order.txt` on disk | Share sheet (`expo-sharing`) |
 | OAuth `http://127.0.0.1:8765/callback` | `discogvinylsorter://callback` |
-| `CTk` settings panel | Settings tab |
-| Treeview drag reorder | `DraggableFlatList` long-press drag |
+| CustomTkinter settings panel | Stack `SettingsScreen` |
+| Treeview drag reorder | Draggable list **planned**, not in UI yet |
 | Print via Notepad | Not available |
-| Obfuscated JSON config | SecureStore (tokens) + AsyncStorage (prefs) |
-| `show_prices` cleared on launch | Persisted; user toggles in Settings |
-
----
-
-## OAuth setup
-
-Register a Discogs application at [discogs.com/settings/developers](https://www.discogs.com/settings/developers).
-
-| Platform | Callback URL |
-|----------|----------------|
-| Windows | `http://127.0.0.1:8765/callback` |
-| Mobile | `discogvinylsorter://callback` |
-
-Mobile `.env` (see `.env.example`):
-
-```
-DISCOGS_CONSUMER_KEY=...
-DISCOGS_CONSUMER_SECRET=...
-```
-
-See `docs/OAUTH_SETUP.md` in the mobile repo.
+| Obfuscated JSON config | SecureStore + AsyncStorage |
 
 ---
 
 ## Test commands
 
-**Windows** (from `discogs-vinyl-sorter-windows`):
+**Mobile:**
+
+```bash
+npm install
+npm test
+```
+
+**Windows** (when validating a paired change):
 
 ```bash
 python test_sorting.py
@@ -124,29 +200,42 @@ python test_format_filter.py
 python test_export_dividers.py
 ```
 
-**Mobile** (from `discogs-vinyl-sorter-mobile`):
-
-```bash
-npm install
-npm test
-```
-
-When Windows `core/sorting.py`, `format_filter.py`, or `export.py` change, update the matching `src/domain/*.ts` files and golden tests in the same session.
+**Sync protocol:** Change Windows `core/` + tests → port `src/domain/` → update `__tests__/*.test.ts` → run both test suites in one session.
 
 ---
 
-## Sync protocol
+## Suggested follow-ups (priority)
 
-1. Make behavioral change on Windows `core/` with tests.
-2. Port logic to `src/domain/` on mobile.
-3. Update or add cases in `__tests__/*.test.ts`.
-4. Run `npm test` and Windows `python test_*.py`.
-5. Note paired commits in PR description or `PARITY.md` (optional).
+1. **Push `develop`** to `origin` after smoke test on device.
+2. ~~Wire **`useCollectionWatch`**~~ — done in `CollectionScreen`.
+3. ~~Wire **manual reorder** UI~~ — done in `CollectionScreen`.
+4. ~~Remove legacy **`src/contexts/SettingsContext.tsx`**~~ — done.
+5. ~~Align **README** / `.env.example` OAuth callback strings~~ — done.
+6. Commit **`docs/MOBILE_PARITY.md`** in the Windows repo (pointer to this file).
+7. Merge **`develop` → `main`** on mobile when ready for release tracking.
 
 ---
 
 ## Open questions (deferred)
 
-- Country/label exclusion (Windows UI backlog #4) — not in mobile v1.
+- Country/label exclusion (Windows backlog #4) — not in mobile v1.
 - Desktop-only: print, Spotify, PyInstaller — out of scope.
-- CLI-only flags — only if added to Settings “Advanced” later.
+- CLI-only flags — only if added under Settings “Advanced” later.
+
+---
+
+## OAuth setup
+
+See **`docs/OAUTH_SETUP.md`**.
+
+| Platform | Callback URL |
+|----------|----------------|
+| Windows | `http://127.0.0.1:8765/callback` |
+| Mobile | `discogvinylsorter://callback` |
+
+Mobile `.env`:
+
+```
+DISCOGS_CONSUMER_KEY=...
+DISCOGS_CONSUMER_SECRET=...
+```

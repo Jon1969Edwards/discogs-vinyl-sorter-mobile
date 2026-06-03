@@ -20,7 +20,7 @@ npm install
 2. (Recommended) For OAuth "Sign in with Discogs", copy `.env.example` to `.env`:
 
    - Create an app at [Discogs → Settings → Developers](https://www.discogs.com/settings/developers)
-   - Add callback URL: `discogvinylsorter://oauth/callback`
+   - Add callback URL: `discogvinylsorter://callback` (see `docs/OAUTH_SETUP.md`)
    - Add your consumer key and secret to `.env`
 
 3. Start the development server:

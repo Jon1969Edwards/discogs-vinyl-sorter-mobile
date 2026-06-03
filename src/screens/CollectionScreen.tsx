@@ -15,8 +15,13 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import DraggableFlatList, {
+  ScaleDecorator,
+  type RenderItemParams,
+} from 'react-native-draggable-flatlist';
 import type { ReleaseRow } from '../types';
 import { useCollection } from '../hooks/useCollection';
+import { useCollectionWatch } from '../hooks/useCollectionWatch';
 import { useSettings } from '../context/SettingsContext';
 import { sortRows, getSectionLetter } from '../utils';
 import { GUI_BUILD_SORT } from '../types';
@@ -26,6 +31,11 @@ import {
   exportAndShare,
   type ExportFormat,
 } from '../services';
+import {
+  setManualOrder,
+  clearManualOrder,
+  manualOrderIsEnabled,
+} from '../services/manualOrder';
 
 export type RootStackParamList = {
   MainTabs: undefined;
@@ -40,15 +50,36 @@ type CollectionScreenProps = {
   onSignOut: () => void;
 };
 
+function rowKey(item: ReleaseRow, index: number): string {
+  if (item.release_id != null) return `r-${item.release_id}`;
+  if (item.instance_id != null) return `i-${item.instance_id}`;
+  return `row-${index}`;
+}
+
 function AlbumRow({
   item,
   onPress,
+  drag,
+  reorderMode,
 }: {
   item: ReleaseRow;
   onPress: () => void;
+  drag?: () => void;
+  reorderMode?: boolean;
 }) {
   return (
-    <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={[styles.row, reorderMode && styles.rowReorder]}
+      onPress={reorderMode ? undefined : onPress}
+      onLongPress={reorderMode ? drag : undefined}
+      delayLongPress={reorderMode ? 120 : undefined}
+      activeOpacity={0.7}
+    >
+      {reorderMode ? (
+        <Text style={styles.dragHandle} accessibilityLabel="Drag to reorder">
+          ≡
+        </Text>
+      ) : null}
       {item.thumb_url ? (
         <Image source={{ uri: item.thumb_url }} style={styles.thumb} />
       ) : (
@@ -78,8 +109,13 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
   const [search, setSearch] = useState('');
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [manualOrderActive, setManualOrderActive] = useState(false);
+  const [manualOverrideRows, setManualOverrideRows] = useState<ReleaseRow[] | null>(null);
+  const [reorderMode, setReorderMode] = useState(false);
+  const [reorderRows, setReorderRows] = useState<ReleaseRow[]>([]);
 
   const settingsKey = `${settings.formats.join(',')}|${settings.sort_by}|${settings.show_prices}`;
+  const showDividers = settings.divider_mode !== 'none';
 
   useEffect(() => {
     getStoredCredentials().then(setCredentials);
@@ -96,6 +132,14 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
   useEffect(() => {
     if (state.status === 'success') hasFetched.current = true;
   }, [state.status]);
+
+  useEffect(() => {
+    if (state.status === 'success') {
+      setManualOverrideRows(null);
+      void manualOrderIsEnabled().then(setManualOrderActive);
+    }
+  }, [state.status, state.status === 'success' ? state.rows : null]);
+
   useEffect(() => {
     if (
       hasFetched.current &&
@@ -108,30 +152,25 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
     prevSettingsKey.current = settingsKey;
   }, [settingsKey, credentials, reset]);
 
+  const onDiscogsCountChanged = useCallback(() => {
+    reset();
+  }, [reset]);
+
+  useCollectionWatch(
+    onDiscogsCountChanged,
+    !!credentials && state.status === 'success' && !reorderMode
+  );
+
   const handleSignOut = useCallback(async () => {
     await clearStoredCredentials();
     reset();
     onSignOut();
   }, [onSignOut, reset]);
 
-  const handleExport = useCallback(
-    async (format: ExportFormat) => {
-      if (state.status !== 'success' || state.rows.length === 0) return;
-      setExporting(true);
-      setExportError(null);
-      try {
-        await exportAndShare(state.rows, format);
-      } catch (err) {
-        setExportError(err instanceof Error ? err.message : 'Export failed');
-      } finally {
-        setExporting(false);
-      }
-    },
-    [state]
-  );
-
-  const sortedRows = useMemo(() => {
+  const catalogRows = useMemo(() => {
     if (state.status !== 'success') return [];
+    if (manualOverrideRows) return manualOverrideRows;
+    if (manualOrderActive) return state.rows;
     return sortRows(
       state.rows,
       GUI_BUILD_SORT.variousPolicy,
@@ -140,24 +179,40 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
   }, [
     state.status,
     state.status === 'success' ? state.rows : [],
+    manualOrderActive,
+    manualOverrideRows,
     settings.sort_by,
   ]);
 
-  const filteredRows =
-    state.status === 'success' && search.trim()
-      ? sortedRows.filter((r) => {
-          const q = search.toLowerCase();
-          return (
-            r.artist_display.toLowerCase().includes(q) ||
-            r.title.toLowerCase().includes(q)
-          );
-        })
-      : state.status === 'success'
-        ? sortedRows
-        : [];
+  const handleExport = useCallback(
+    async (format: ExportFormat) => {
+      if (state.status !== 'success' || catalogRows.length === 0) return;
+      setExporting(true);
+      setExportError(null);
+      try {
+        await exportAndShare(catalogRows, format);
+      } catch (err) {
+        setExportError(err instanceof Error ? err.message : 'Export failed');
+      } finally {
+        setExporting(false);
+      }
+    },
+    [state.status, catalogRows]
+  );
+
+  const filteredRows = useMemo(() => {
+    if (!search.trim()) return catalogRows;
+    const q = search.toLowerCase();
+    return catalogRows.filter((r) => {
+      return (
+        r.artist_display.toLowerCase().includes(q) ||
+        r.title.toLowerCase().includes(q)
+      );
+    });
+  }, [catalogRows, search]);
 
   const sections = useMemo(() => {
-    if (settings.divider_mode === 'none' || filteredRows.length === 0) return [];
+    if (!showDividers || reorderMode || filteredRows.length === 0) return [];
     const map = new Map<string, ReleaseRow[]>();
     for (const row of filteredRows) {
       const letter = getSectionLetter(row, settings.sort_by);
@@ -175,7 +230,45 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
       return a.localeCompare(b);
     });
     return keys.map((title) => ({ title, data: map.get(title) ?? [] }));
-  }, [filteredRows, settings.divider_mode, settings.sort_by]);
+  }, [filteredRows, showDividers, reorderMode, settings.sort_by]);
+
+  const enterReorderMode = useCallback(() => {
+    if (search.trim()) return;
+    setReorderRows(catalogRows);
+    setReorderMode(true);
+  }, [catalogRows, search]);
+
+  const finishReorder = useCallback(async () => {
+    const ids = reorderRows
+      .map((r) => r.release_id)
+      .filter((id): id is number => id != null);
+    await setManualOrder(ids);
+    setManualOrderActive(true);
+    setManualOverrideRows(reorderRows);
+    setReorderMode(false);
+  }, [reorderRows]);
+
+  const resetShelfOrder = useCallback(async () => {
+    await clearManualOrder();
+    setManualOrderActive(false);
+    setManualOverrideRows(null);
+    setReorderMode(false);
+    reset();
+  }, [reset]);
+
+  const renderDraggableItem = useCallback(
+    ({ item, drag, isActive }: RenderItemParams<ReleaseRow>) => (
+      <ScaleDecorator activeScale={1.02}>
+        <AlbumRow
+          item={item}
+          onPress={() => navigation.navigate('AlbumDetail', { release: item })}
+          drag={drag}
+          reorderMode
+        />
+      </ScaleDecorator>
+    ),
+    [navigation]
+  );
 
   if (state.status === 'loading') {
     return (
@@ -218,25 +311,63 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
       <View style={styles.header}>
         <Text style={styles.headerTitle}>
           {state.username}'s LPs ({state.rows.length})
+          {manualOrderActive ? ' · custom order' : ''}
         </Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Settings')}
-            style={styles.refreshBtn}
-          >
-            <Text style={styles.refreshText}>Settings</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => credentials && reset()}
-            style={styles.refreshBtn}
-          >
-            <Text style={styles.refreshText}>Refresh</Text>
-          </TouchableOpacity>
+          {reorderMode ? (
+            <>
+              <TouchableOpacity onPress={() => void finishReorder()} style={styles.refreshBtn}>
+                <Text style={styles.refreshText}>Done</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => void resetShelfOrder()} style={styles.refreshBtn}>
+                <Text style={styles.refreshText}>Reset</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity
+                onPress={enterReorderMode}
+                style={styles.refreshBtn}
+                disabled={!!search.trim()}
+              >
+                <Text
+                  style={[
+                    styles.refreshText,
+                    !!search.trim() && styles.actionDisabled,
+                  ]}
+                >
+                  Reorder
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('Settings')}
+                style={styles.refreshBtn}
+              >
+                <Text style={styles.refreshText}>Settings</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => credentials && reset()}
+                style={styles.refreshBtn}
+              >
+                <Text style={styles.refreshText}>Refresh</Text>
+              </TouchableOpacity>
+            </>
+          )}
           <TouchableOpacity onPress={handleSignOut}>
             <Text style={styles.signOut}>Sign Out</Text>
           </TouchableOpacity>
         </View>
       </View>
+
+      {state.stale ? (
+        <Text style={styles.staleBanner}>
+          Showing cached collection — tap Refresh to sync
+        </Text>
+      ) : null}
+
+      {reorderMode ? (
+        <Text style={styles.reorderHint}>Long-press a row, then drag to set shelf order</Text>
+      ) : null}
 
       <TextInput
         style={styles.search}
@@ -244,6 +375,7 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
         placeholderTextColor="#666"
         value={search}
         onChangeText={setSearch}
+        editable={!reorderMode}
       />
 
       <View style={styles.exportBar}>
@@ -251,21 +383,21 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
         <TouchableOpacity
           style={[styles.exportBtn, exporting && styles.exportBtnDisabled]}
           onPress={() => handleExport('txt')}
-          disabled={exporting}
+          disabled={exporting || reorderMode}
         >
           <Text style={styles.exportBtnText}>TXT</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.exportBtn, exporting && styles.exportBtnDisabled]}
           onPress={() => handleExport('csv')}
-          disabled={exporting}
+          disabled={exporting || reorderMode}
         >
           <Text style={styles.exportBtnText}>CSV</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.exportBtn, exporting && styles.exportBtnDisabled]}
           onPress={() => handleExport('json')}
-          disabled={exporting}
+          disabled={exporting || reorderMode}
         >
           <Text style={styles.exportBtnText}>JSON</Text>
         </TouchableOpacity>
@@ -274,10 +406,20 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
         <Text style={styles.exportError}>{exportError}</Text>
       ) : null}
 
-      {effectiveSettings.showDividers && sections.length > 0 && Platform.OS !== 'web' ? (
+      {reorderMode ? (
+        <DraggableFlatList
+          data={reorderRows}
+          onDragEnd={({ data }) => setReorderRows(data)}
+          keyExtractor={(item, index) => rowKey(item, index)}
+          renderItem={renderDraggableItem}
+          ListEmptyComponent={
+            <Text style={styles.empty}>No LPs in collection</Text>
+          }
+        />
+      ) : showDividers && sections.length > 0 && Platform.OS !== 'web' ? (
         <SectionList
           sections={sections}
-          keyExtractor={(_, index) => `lp-${index}`}
+          keyExtractor={(item, index) => rowKey(item, index)}
           renderItem={({ item }) => (
             <AlbumRow
               item={item}
@@ -299,7 +441,7 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
       ) : (
         <FlatList
           data={filteredRows}
-          keyExtractor={(_, index) => `lp-${index}`}
+          keyExtractor={(item, index) => rowKey(item, index)}
           renderItem={({ item }) => (
             <AlbumRow
               item={item}
@@ -336,23 +478,41 @@ const styles = StyleSheet.create({
     paddingTop: 48,
   },
   headerTitle: {
+    flex: 1,
     fontSize: 18,
     fontWeight: '600',
     color: '#eee',
+    marginRight: 8,
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 12,
+    flexShrink: 0,
   },
   refreshBtn: {},
   refreshText: {
     color: '#aaa',
     fontSize: 14,
   },
+  actionDisabled: {
+    opacity: 0.4,
+  },
   signOut: {
     color: '#e94560',
     fontSize: 14,
+  },
+  staleBanner: {
+    color: '#f0ad4e',
+    fontSize: 13,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  reorderHint: {
+    color: '#888',
+    fontSize: 13,
+    paddingHorizontal: 16,
+    marginBottom: 8,
   },
   search: {
     backgroundColor: '#252542',
@@ -423,6 +583,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#252542',
+  },
+  rowReorder: {
+    backgroundColor: '#222240',
+  },
+  dragHandle: {
+    width: 28,
+    fontSize: 22,
+    color: '#888',
+    textAlign: 'center',
+    alignSelf: 'center',
+    marginRight: 4,
   },
   thumb: {
     width: 48,

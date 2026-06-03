@@ -7,6 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthScreen } from './src/screens/AuthScreen';
@@ -37,6 +38,7 @@ export default function App() {
   }
 
   return (
+    <GestureHandlerRootView style={styles.root}>
     <SafeAreaProvider>
       <SettingsProvider>
         <NavigationContainer>
@@ -84,10 +86,14 @@ export default function App() {
         </NavigationContainer>
       </SettingsProvider>
     </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   loading: {
     flex: 1,
     backgroundColor: '#1a1a2e',
