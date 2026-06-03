@@ -4,9 +4,13 @@
  */
 
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
+import type { AuthCredentials } from './auth';
+import { getConsumerCredentials, getOAuthAuthHeader } from './oauthDiscogs';
+import type { ReleaseRow } from '../types';
 
 const API_BASE = 'https://api.discogs.com';
-const USER_AGENT = 'DiscogsVinylSorter/1.0 (https://github.com/discogs-vinyl-sorter-mobile)';
+const DEFAULT_USER_AGENT =
+  'DiscogsVinylSorter/1.0 (https://github.com/discogs-vinyl-sorter-mobile)';
 
 // ---------------------------------------------------------------------------
 // Types (Discogs API responses)
@@ -63,35 +67,72 @@ export interface DiscogsMarketplaceStats {
 // API client factory
 // ---------------------------------------------------------------------------
 
-export function createDiscogsClient(token: string): AxiosInstance {
+export function createDiscogsClient(
+  token: string,
+  userAgent = DEFAULT_USER_AGENT
+): AxiosInstance {
   const client = axios.create({
     baseURL: API_BASE,
     timeout: 30000,
     headers: {
       Authorization: `Discogs token=${token}`,
-      'User-Agent': USER_AGENT,
+      'User-Agent': userAgent,
       Accept: 'application/json',
     },
   });
+  attachRetryInterceptor(client);
+  return client;
+}
 
-  // Response interceptor: rate limit pause
-  client.interceptors.response.use(
-    (response) => {
-      const remaining = parseInt(
-        response.headers['x-discogs-ratelimit-remaining'] ?? '5',
-        10
+export function createAuthenticatedClient(
+  auth: AuthCredentials,
+  userAgent = DEFAULT_USER_AGENT
+): AxiosInstance {
+  if (auth.mode === 'pat' && auth.pat) {
+    return createDiscogsClient(auth.pat, userAgent);
+  }
+
+  if (auth.mode === 'oauth' && auth.oauthToken && auth.oauthSecret) {
+    const creds = getConsumerCredentials();
+    if (!creds) {
+      throw new Error('OAuth consumer credentials not configured');
+    }
+    const client = axios.create({
+      baseURL: API_BASE,
+      timeout: 30000,
+      headers: {
+        'User-Agent': userAgent,
+        Accept: 'application/json',
+      },
+    });
+
+    client.interceptors.request.use((config) => {
+      const url = `${config.baseURL || API_BASE}${config.url || ''}`;
+      const method = (config.method?.toUpperCase() || 'GET') as 'GET' | 'POST';
+      const oauthHeaders = getOAuthAuthHeader(
+        url,
+        method,
+        creds.key,
+        creds.secret,
+        auth.oauthToken!,
+        auth.oauthSecret!
       );
-      if (remaining <= 1) {
-        // Will be handled async – we can't block on React Native, so we just
-        // let the next request potentially hit rate limit. The retry will handle it.
-        // For now, no synchronous sleep – axios-interceptors can't easily delay.
-      }
-      return response;
-    },
+      config.headers = { ...config.headers, ...oauthHeaders };
+      return config;
+    });
+
+    attachRetryInterceptor(client);
+    return client;
+  }
+
+  throw new Error('No authentication credentials');
+}
+
+function attachRetryInterceptor(client: AxiosInstance): void {
+  client.interceptors.response.use(
+    (response) => response,
     (error) => Promise.reject(error)
   );
-
-  return client;
 }
 
 // ---------------------------------------------------------------------------
@@ -106,16 +147,12 @@ function getRetryDelay(response: AxiosResponse | undefined, attempt: number): nu
   const backoff = 1.0;
   if (response?.headers['retry-after']) {
     const val = parseFloat(response.headers['retry-after']);
-    if (!Number.isNaN(val)) return val * 1000; // convert to ms
+    if (!Number.isNaN(val)) return val * 1000;
   }
   return Math.min(backoff * Math.pow(2, attempt) * 1000, 10000);
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-// ---------------------------------------------------------------------------
-// Request wrapper with retries
-// ---------------------------------------------------------------------------
 
 export async function apiGet<T>(
   client: AxiosInstance,
@@ -142,7 +179,6 @@ export async function apiGet<T>(
         }
       }
 
-      // Network error (no response) – retry
       if (!axErr?.response && attempt < retries - 1) {
         const delay = getRetryDelay(undefined, attempt);
         await sleep(delay);
@@ -162,6 +198,18 @@ export async function apiGet<T>(
 
 export async function getIdentity(client: AxiosInstance): Promise<DiscogsIdentity> {
   return apiGet<DiscogsIdentity>(client, '/oauth/identity');
+}
+
+export async function getCollectionCount(
+  client: AxiosInstance,
+  username: string
+): Promise<number> {
+  const data = await apiGet<DiscogsCollectionResponse>(
+    client,
+    `/users/${username}/collection/folders/0/releases`,
+    { page: '1', per_page: '1' }
+  );
+  return data.pagination?.items ?? 0;
 }
 
 export async function fetchCollectionPage(
@@ -245,5 +293,29 @@ export async function fetchMarketplaceStats(
     return { lowestPrice, numForSale, currency: actualCurrency };
   } catch {
     return { lowestPrice: null, numForSale: 0, currency };
+  }
+}
+
+export async function attachPricesToRows(
+  client: AxiosInstance,
+  rows: ReleaseRow[],
+  currency: string,
+  onProgress?: (done: number, total: number) => void
+): Promise<void> {
+  const withIds = rows.filter((r) => r.release_id != null);
+  const total = withIds.length;
+  let done = 0;
+
+  for (const row of withIds) {
+    const stats = await fetchMarketplaceStats(
+      client,
+      row.release_id!,
+      currency
+    );
+    row.lowest_price = stats.lowestPrice;
+    row.num_for_sale = stats.numForSale;
+    row.price_currency = stats.currency;
+    done += 1;
+    onProgress?.(done, total);
   }
 }

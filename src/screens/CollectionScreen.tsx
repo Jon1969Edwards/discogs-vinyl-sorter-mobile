@@ -1,43 +1,66 @@
 /**
- * Collection screen – list of sorted LPs with thumbnails.
+ * Collection screen – sorted shelf with search, export, manual reorder.
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
-  Image,
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Linking,
 } from 'react-native';
+import { Image } from 'expo-image';
+import DraggableFlatList, {
+  ScaleDecorator,
+  type RenderItemParams,
+} from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import type { ReleaseRow } from '../types';
+import { useFocusEffect } from '@react-navigation/native';
 import { useCollection } from '../hooks/useCollection';
+import { useCollectionWatch } from '../hooks/useCollectionWatch';
+import { useSettings } from '../hooks/useSettings';
+import { FORMAT_FILTERS } from '../domain/formatFilter';
+import { useWishlist } from '../hooks/useWishlist';
 import {
-  getStoredToken,
-  clearStoredToken,
+  getAuthCredentials,
   exportAndShare,
+  setManualOrder,
+  setManualOrderEnabled,
+  manualOrderIsEnabled,
+  isInWishlist,
   type ExportFormat,
 } from '../services';
+import { useCachedThumb } from '../services/thumbnailCache';
+import {
+  AlbumDetailModal,
+  rowToWishlistEntry,
+} from '../components/AlbumDetailModal';
 
-interface CollectionScreenProps {
-  onSignOut: () => void;
-}
-
-function AlbumRow({
+function AlbumRowContent({
   item,
-  onPress,
+  showPrices,
 }: {
   item: ReleaseRow;
-  onPress: () => void;
+  showPrices: boolean;
 }) {
+  const thumbUri = useCachedThumb(item.thumb_url);
+  const priceLabel =
+    showPrices &&
+    item.lowest_price != null &&
+    item.num_for_sale != null &&
+    item.num_for_sale > 0
+      ? `${Math.round(item.lowest_price)} ${item.price_currency || 'USD'}+`
+      : showPrices
+        ? '—'
+        : null;
+
   return (
-    <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
-      {item.thumb_url ? (
-        <Image source={{ uri: item.thumb_url }} style={styles.thumb} />
+    <>
+      {thumbUri ? (
+        <Image source={{ uri: thumbUri }} style={styles.thumb} contentFit="cover" />
       ) : (
         <View style={[styles.thumb, styles.thumbPlaceholder]} />
       )}
@@ -48,67 +71,173 @@ function AlbumRow({
         <Text style={styles.title} numberOfLines={1}>
           {item.title}
         </Text>
-        {(item.year || item.country) && (
-          <Text style={styles.meta} numberOfLines={1}>
-            {[item.year, item.country].filter(Boolean).join(' • ')}
-          </Text>
-        )}
+        <View style={styles.metaRow}>
+          {(item.year || item.country) && (
+            <Text style={styles.meta} numberOfLines={1}>
+              {[item.year, item.country].filter(Boolean).join(' • ')}
+            </Text>
+          )}
+          {priceLabel ? (
+            <Text style={styles.price}>{priceLabel}</Text>
+          ) : null}
+        </View>
       </View>
-    </TouchableOpacity>
+    </>
   );
 }
 
-export function CollectionScreen({ onSignOut }: CollectionScreenProps) {
+interface CollectionScreenProps {
+  settingsVersion?: number;
+}
+
+function formatFilterLabel(formats: string[]): string {
+  if (formats.includes('everything')) return 'Everything';
+  return formats
+    .map((f) => FORMAT_FILTERS.find(([id]) => id === f)?.[1] ?? f)
+    .join(', ');
+}
+
+export function CollectionScreen({ settingsVersion = 0 }: CollectionScreenProps) {
   const { state, fetchCollection, reset } = useCollection();
-  const [token, setToken] = useState<string | null>(null);
+  const { settings, reload } = useSettings();
+  const { entries: wishlistEntries, add: addWish, remove: removeWish } =
+    useWishlist();
   const [search, setSearch] = useState('');
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [manualMode, setManualMode] = useState(false);
+  const [displayRows, setDisplayRows] = useState<ReleaseRow[]>([]);
+  const [selected, setSelected] = useState<ReleaseRow | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
-    getStoredToken().then(setToken);
+    manualOrderIsEnabled().then(setManualMode);
   }, []);
 
   useEffect(() => {
-    if (token && state.status === 'idle') {
-      fetchCollection(token);
-    }
-  }, [token, state.status, fetchCollection]);
+    getAuthCredentials().then((auth) => {
+      if (auth.mode !== 'none' && state.status === 'idle') {
+        fetchCollection();
+      }
+    });
+  }, [state.status, fetchCollection]);
 
-  const handleSignOut = useCallback(async () => {
-    await clearStoredToken();
+  useFocusEffect(
+    useCallback(() => {
+      reload();
+    }, [reload])
+  );
+
+  useEffect(() => {
+    if (settingsVersion > 0) {
+      reload().then(() => {
+        reset();
+        fetchCollection();
+      });
+    }
+  }, [settingsVersion, reload, reset, fetchCollection]);
+
+  const onPollRefresh = useCallback(() => {
     reset();
-    onSignOut();
-  }, [onSignOut, reset]);
+    fetchCollection();
+  }, [reset, fetchCollection]);
+
+  useCollectionWatch(onPollRefresh, state.status === 'success');
+
+  useEffect(() => {
+    if (state.status === 'success') {
+      setDisplayRows(state.rows);
+    }
+  }, [state]);
+
+  const filteredRows = useMemo(() => {
+    if (state.status !== 'success') return [];
+    const q = search.trim().toLowerCase();
+    if (!q) return displayRows;
+    return displayRows.filter(
+      (r) =>
+        r.artist_display.toLowerCase().includes(q) ||
+        r.title.toLowerCase().includes(q)
+    );
+  }, [state, displayRows, search]);
+
+  const handleRefresh = useCallback(() => {
+    reset();
+    fetchCollection();
+  }, [reset, fetchCollection]);
 
   const handleExport = useCallback(
     async (format: ExportFormat) => {
-      if (state.status !== 'success' || state.rows.length === 0) return;
+      if (state.status !== 'success' || displayRows.length === 0) return;
       setExporting(true);
       setExportError(null);
       try {
-        await exportAndShare(state.rows, format);
+        await exportAndShare(displayRows, format);
       } catch (err) {
         setExportError(err instanceof Error ? err.message : 'Export failed');
       } finally {
         setExporting(false);
       }
     },
-    [state]
+    [state, displayRows]
   );
 
-  const filteredRows =
-    state.status === 'success' && search.trim()
-      ? state.rows.filter((r) => {
-          const q = search.toLowerCase();
-          return (
-            r.artist_display.toLowerCase().includes(q) ||
-            r.title.toLowerCase().includes(q)
-          );
-        })
-      : state.status === 'success'
-        ? state.rows
-        : [];
+  const toggleManualMode = useCallback(async () => {
+    const next = !manualMode;
+    setManualMode(next);
+    await setManualOrderEnabled(next);
+    if (next && displayRows.length) {
+      const ids = displayRows
+        .map((r) => r.release_id)
+        .filter((id): id is number => id != null);
+      await setManualOrder(ids);
+    }
+  }, [manualMode, displayRows]);
+
+  const onDragEnd = useCallback(
+    async ({ data }: { data: ReleaseRow[] }) => {
+      setDisplayRows(data);
+      const ids = data
+        .map((r) => r.release_id)
+        .filter((id): id is number => id != null);
+      await setManualOrder(ids);
+      await setManualOrderEnabled(true);
+      setManualMode(true);
+    },
+    []
+  );
+
+  const openAlbum = useCallback((row: ReleaseRow) => {
+    setSelected(row);
+    setModalVisible(true);
+  }, []);
+
+  const handleToggleWishlist = useCallback(async () => {
+    if (!selected) return;
+    const entry = rowToWishlistEntry(selected);
+    if (isInWishlist(wishlistEntries, entry.artist, entry.title)) {
+      await removeWish(entry.artist, entry.title);
+    } else {
+      await addWish(entry);
+    }
+  }, [selected, wishlistEntries, addWish, removeWish]);
+
+  const renderDraggableItem = useCallback(
+    ({ item, drag, isActive }: RenderItemParams<ReleaseRow>) => (
+      <ScaleDecorator>
+        <TouchableOpacity
+          style={[styles.row, isActive && styles.rowActive]}
+          onPress={() => openAlbum(item)}
+          onLongPress={manualMode ? drag : undefined}
+          delayLongPress={150}
+          activeOpacity={0.7}
+        >
+          <AlbumRowContent item={item} showPrices={settings.show_prices} />
+        </TouchableOpacity>
+      </ScaleDecorator>
+    ),
+    [manualMode, openAlbum, settings.show_prices]
+  );
 
   if (state.status === 'loading') {
     return (
@@ -125,14 +254,8 @@ export function CollectionScreen({ onSignOut }: CollectionScreenProps) {
     return (
       <View style={styles.center}>
         <Text style={styles.errorText}>{state.error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={() => reset()}>
+        <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
           <Text style={styles.retryButtonText}>Try Again</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.retryButton, styles.signOutButton]}
-          onPress={handleSignOut}
-        >
-          <Text style={styles.retryButtonText}>Sign Out</Text>
         </TouchableOpacity>
       </View>
     );
@@ -146,24 +269,29 @@ export function CollectionScreen({ onSignOut }: CollectionScreenProps) {
     );
   }
 
+  const formatLabel = formatFilterLabel(settings.formats);
+
   return (
-    <View style={styles.container}>
+    <GestureHandlerRootView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>
-          {state.username}'s LPs ({state.rows.length})
+          {state.username}'s {formatLabel} ({displayRows.length})
         </Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity
-            onPress={() => token && reset()}
-            style={styles.refreshBtn}
-          >
-            <Text style={styles.refreshText}>Refresh</Text>
+          <TouchableOpacity onPress={toggleManualMode}>
+            <Text style={manualMode ? styles.manualOn : styles.refreshText}>
+              {manualMode ? 'Manual ✓' : 'Manual'}
+            </Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleSignOut}>
-            <Text style={styles.signOut}>Sign Out</Text>
+          <TouchableOpacity onPress={handleRefresh}>
+            <Text style={styles.refreshText}>Refresh</Text>
           </TouchableOpacity>
         </View>
       </View>
+
+      {state.stale ? (
+        <Text style={styles.staleBanner}>Showing cached data — refresh recommended</Text>
+      ) : null}
 
       <TextInput
         style={styles.search}
@@ -175,56 +303,61 @@ export function CollectionScreen({ onSignOut }: CollectionScreenProps) {
 
       <View style={styles.exportBar}>
         <Text style={styles.exportLabel}>Export:</Text>
-        <TouchableOpacity
-          style={[styles.exportBtn, exporting && styles.exportBtnDisabled]}
-          onPress={() => handleExport('txt')}
-          disabled={exporting}
-        >
-          <Text style={styles.exportBtnText}>TXT</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.exportBtn, exporting && styles.exportBtnDisabled]}
-          onPress={() => handleExport('csv')}
-          disabled={exporting}
-        >
-          <Text style={styles.exportBtnText}>CSV</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.exportBtn, exporting && styles.exportBtnDisabled]}
-          onPress={() => handleExport('json')}
-          disabled={exporting}
-        >
-          <Text style={styles.exportBtnText}>JSON</Text>
-        </TouchableOpacity>
+        {(['txt', 'csv', 'json'] as ExportFormat[]).map((fmt) => (
+          <TouchableOpacity
+            key={fmt}
+            style={[styles.exportBtn, exporting && styles.exportBtnDisabled]}
+            onPress={() => handleExport(fmt)}
+            disabled={exporting}
+          >
+            <Text style={styles.exportBtnText}>{fmt.toUpperCase()}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
       {exportError ? (
         <Text style={styles.exportError}>{exportError}</Text>
       ) : null}
 
-      <FlatList
+      {manualMode ? (
+        <Text style={styles.hint}>Long-press and drag to reorder shelf</Text>
+      ) : null}
+
+      <DraggableFlatList
         data={filteredRows}
-        keyExtractor={(item) => `${item.release_id ?? item.artist_display}-${item.title}`}
-        renderItem={({ item }) => (
-          <AlbumRow
-            item={item}
-            onPress={() => item.discogs_url && Linking.openURL(item.discogs_url)}
-          />
-        )}
+        keyExtractor={(item) =>
+          `${item.release_id ?? item.artist_display}-${item.title}`
+        }
+        renderItem={renderDraggableItem}
+        onDragEnd={manualMode ? onDragEnd : undefined}
+        activationDistance={manualMode ? 0 : 9999}
         ListEmptyComponent={
           <Text style={styles.empty}>
-            {search ? 'No matches' : 'No LPs in collection'}
+            {search ? 'No matches' : 'No matching items in collection'}
           </Text>
         }
       />
-    </View>
+
+      <AlbumDetailModal
+        visible={modalVisible}
+        row={selected}
+        onClose={() => setModalVisible(false)}
+        inWishlist={
+          selected
+            ? isInWishlist(
+                wishlistEntries,
+                selected.artist_display,
+                selected.title
+              )
+            : false
+        }
+        onToggleWishlist={handleToggleWishlist}
+      />
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#1a1a2e',
-  },
+  container: { flex: 1, backgroundColor: '#1a1a2e' },
   center: {
     flex: 1,
     backgroundColor: '#1a1a2e',
@@ -236,26 +369,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    paddingTop: 48,
+    paddingTop: 8,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#eee',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  refreshBtn: {},
-  refreshText: {
-    color: '#aaa',
-    fontSize: 14,
-  },
-  signOut: {
-    color: '#e94560',
-    fontSize: 14,
+  headerTitle: { fontSize: 17, fontWeight: '600', color: '#eee', flex: 1 },
+  headerActions: { flexDirection: 'row', gap: 12 },
+  refreshText: { color: '#aaa', fontSize: 14 },
+  manualOn: { color: '#e94560', fontSize: 14, fontWeight: '600' },
+  staleBanner: {
+    color: '#e9c46a',
+    fontSize: 12,
+    paddingHorizontal: 16,
+    marginBottom: 4,
   },
   search: {
     backgroundColor: '#252542',
@@ -273,34 +397,28 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     gap: 8,
   },
-  exportLabel: {
-    color: '#666',
-    fontSize: 14,
-  },
+  exportLabel: { color: '#666', fontSize: 14 },
   exportBtn: {
     backgroundColor: '#252542',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 8,
   },
-  exportBtnDisabled: {
-    opacity: 0.5,
-  },
-  exportBtnText: {
-    color: '#e94560',
-    fontSize: 14,
-    fontWeight: '600',
-  },
+  exportBtnDisabled: { opacity: 0.5 },
+  exportBtnText: { color: '#e94560', fontSize: 14, fontWeight: '600' },
   exportError: {
     color: '#e94560',
     fontSize: 13,
     paddingHorizontal: 16,
     marginBottom: 8,
   },
-  loadingText: {
-    color: '#aaa',
-    marginTop: 16,
+  hint: {
+    color: '#666',
+    fontSize: 12,
+    paddingHorizontal: 16,
+    marginBottom: 4,
   },
+  loadingText: { color: '#aaa', marginTop: 16 },
   errorText: {
     color: '#e94560',
     textAlign: 'center',
@@ -312,14 +430,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#e94560',
     borderRadius: 8,
   },
-  retryButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  signOutButton: {
-    backgroundColor: 'transparent',
-    marginTop: 12,
-  },
+  retryButtonText: { color: '#fff', fontWeight: '600' },
   row: {
     flexDirection: 'row',
     padding: 12,
@@ -327,36 +438,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#252542',
   },
-  thumb: {
-    width: 48,
-    height: 48,
-    borderRadius: 4,
-  },
-  thumbPlaceholder: {
-    backgroundColor: '#252542',
-  },
-  rowText: {
-    flex: 1,
-    marginLeft: 12,
-    justifyContent: 'center',
-  },
-  artist: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#eee',
-  },
-  title: {
-    fontSize: 14,
-    color: '#bbb',
-  },
-  meta: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 2,
-  },
-  empty: {
-    color: '#666',
-    textAlign: 'center',
-    padding: 24,
-  },
+  rowActive: { backgroundColor: '#252542' },
+  thumb: { width: 48, height: 48, borderRadius: 4 },
+  thumbPlaceholder: { backgroundColor: '#252542' },
+  rowText: { flex: 1, marginLeft: 12, justifyContent: 'center' },
+  artist: { fontSize: 16, fontWeight: '600', color: '#eee' },
+  title: { fontSize: 14, color: '#bbb' },
+  metaRow: { flexDirection: 'row', gap: 8, marginTop: 2 },
+  meta: { fontSize: 12, color: '#666' },
+  price: { fontSize: 12, color: '#e94560' },
+  empty: { color: '#666', textAlign: 'center', padding: 24 },
 });

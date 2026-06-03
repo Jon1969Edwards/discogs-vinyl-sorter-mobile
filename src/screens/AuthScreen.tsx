@@ -1,5 +1,5 @@
 /**
- * Auth screen – enter Discogs Personal Access Token.
+ * Auth screen – OAuth sign-in or Personal Access Token.
  */
 
 import React, { useState, useCallback } from 'react';
@@ -15,7 +15,14 @@ import {
   Linking,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { setStoredToken, getStoredToken } from '../services';
+import {
+  setStoredToken,
+  setOAuthCredentials,
+  createAuthenticatedClient,
+  getIdentity,
+  isOAuthConfigured,
+  runOAuthFlow,
+} from '../services';
 
 const DISCOGS_TOKEN_URL = 'https://www.discogs.com/settings/developers';
 
@@ -27,18 +34,30 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [token, setToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [checkingStored, setCheckingStored] = useState(true);
+  const [showPat, setShowPat] = useState(false);
+  const oauthAvailable = isOAuthConfigured();
 
-  React.useEffect(() => {
-    getStoredToken().then((stored) => {
-      setCheckingStored(false);
-      if (stored) {
-        setToken(stored);
-      }
-    });
-  }, []);
+  const handleOAuth = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { accessToken, accessSecret } = await runOAuthFlow();
+      await setOAuthCredentials(accessToken, accessSecret);
+      const client = createAuthenticatedClient({
+        mode: 'oauth',
+        oauthToken: accessToken,
+        oauthSecret: accessSecret,
+      });
+      await getIdentity(client);
+      onAuthenticated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'OAuth sign-in failed');
+    } finally {
+      setLoading(false);
+    }
+  }, [onAuthenticated]);
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmitPat = useCallback(async () => {
     const t = token.trim();
     if (!t) {
       setError('Enter your Discogs Personal Access Token');
@@ -49,10 +68,16 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     setError(null);
 
     try {
+      const client = createAuthenticatedClient({ mode: 'pat', pat: t });
+      await getIdentity(client);
       await setStoredToken(t);
       onAuthenticated();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save token');
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Invalid token — could not verify with Discogs'
+      );
     } finally {
       setLoading(false);
     }
@@ -70,18 +95,6 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     }
   }, []);
 
-  const handleOpenDiscogs = useCallback(() => {
-    Linking.openURL(DISCOGS_TOKEN_URL);
-  }, []);
-
-  if (checkingStored) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#e94560" />
-      </View>
-    );
-  }
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -90,58 +103,81 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
       <View style={styles.content}>
         <Text style={styles.title}>Discogs Vinyl Sorter</Text>
         <Text style={styles.subtitle}>
-          Enter your Discogs Personal Access Token to load your collection.
+          Sign in to load and sort your Discogs collection.
         </Text>
-        <Text style={styles.hint}>
-          You need a computer to create a token. Then paste it here or use the
-          same token on both devices.
-        </Text>
+
+        {oauthAvailable ? (
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleOAuth}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Sign in with Discogs</Text>
+            )}
+          </TouchableOpacity>
+        ) : (
+          <Text style={styles.hint}>
+            OAuth is not configured in this build. Use a Personal Access Token
+            below, or add DISCOGS_CONSUMER_KEY / DISCOGS_CONSUMER_SECRET to .env.
+          </Text>
+        )}
 
         <TouchableOpacity
           style={styles.linkButton}
-          onPress={handleOpenDiscogs}
-          activeOpacity={0.7}
+          onPress={() => setShowPat((v) => !v)}
         >
-          <Text style={styles.linkText}>Open Discogs to get token</Text>
+          <Text style={styles.linkText}>
+            {showPat ? 'Hide token entry' : 'Advanced: use Personal Access Token'}
+          </Text>
         </TouchableOpacity>
 
-        <View style={styles.inputRow}>
-          <TextInput
-            style={[styles.input, styles.inputFlex]}
-            placeholder="Paste your token here"
-            placeholderTextColor="#666"
-            value={token}
-            onChangeText={(v) => {
-              setToken(v);
-              setError(null);
-            }}
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!loading}
-          />
-          <TouchableOpacity
-            style={styles.pasteButton}
-            onPress={handlePaste}
-            disabled={loading}
-          >
-            <Text style={styles.pasteButtonText}>Paste</Text>
-          </TouchableOpacity>
-        </View>
+        {showPat ? (
+          <>
+            <TouchableOpacity
+              style={styles.linkButton}
+              onPress={() => Linking.openURL(DISCOGS_TOKEN_URL)}
+            >
+              <Text style={styles.linkText}>Open Discogs to get token</Text>
+            </TouchableOpacity>
+
+            <View style={styles.inputRow}>
+              <TextInput
+                style={[styles.input, styles.inputFlex]}
+                placeholder="Paste your token here"
+                placeholderTextColor="#666"
+                value={token}
+                onChangeText={(v) => {
+                  setToken(v);
+                  setError(null);
+                }}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!loading}
+              />
+              <TouchableOpacity
+                style={styles.pasteButton}
+                onPress={handlePaste}
+                disabled={loading}
+              >
+                <Text style={styles.pasteButtonText}>Paste</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.buttonSecondary, loading && styles.buttonDisabled]}
+              onPress={handleSubmitPat}
+              disabled={loading}
+            >
+              <Text style={styles.buttonText}>Continue with token</Text>
+            </TouchableOpacity>
+          </>
+        ) : null}
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
-
-        <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Continue</Text>
-          )}
-        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
@@ -153,15 +189,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a2e',
     justifyContent: 'center',
   },
-  center: {
-    flex: 1,
-    backgroundColor: '#1a1a2e',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  content: {
-    padding: 24,
-  },
+  content: { padding: 24 },
   title: {
     fontSize: 26,
     fontWeight: 'bold',
@@ -171,7 +199,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#aaa',
-    marginBottom: 8,
+    marginBottom: 24,
   },
   hint: {
     fontSize: 13,
@@ -179,7 +207,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   linkButton: {
-    marginBottom: 20,
+    marginTop: 12,
+    marginBottom: 8,
     padding: 12,
     backgroundColor: '#252542',
     borderRadius: 8,
@@ -193,6 +222,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginBottom: 16,
+    marginTop: 8,
   },
   input: {
     backgroundColor: '#252542',
@@ -201,9 +231,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#fff',
   },
-  inputFlex: {
-    flex: 1,
-  },
+  inputFlex: { flex: 1 },
   pasteButton: {
     backgroundColor: '#252542',
     borderRadius: 8,
@@ -218,7 +246,7 @@ const styles = StyleSheet.create({
   error: {
     color: '#e94560',
     fontSize: 14,
-    marginBottom: 16,
+    marginTop: 16,
   },
   button: {
     backgroundColor: '#e94560',
@@ -226,9 +254,14 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
   },
-  buttonDisabled: {
-    opacity: 0.6,
+  buttonSecondary: {
+    backgroundColor: '#252542',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 8,
   },
+  buttonDisabled: { opacity: 0.6 },
   buttonText: {
     color: '#fff',
     fontSize: 16,
