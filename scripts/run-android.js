@@ -10,6 +10,9 @@ const {
   resolveSdkDir,
   sdkTools,
   prependSdkToPath,
+  pickAvd,
+  readAvdAbi,
+  readEmulatorFatal,
 } = require('./android-sdk');
 
 const projectRoot = path.resolve(__dirname, '..');
@@ -36,11 +39,6 @@ function getReadyDevices() {
     .map((line) => line.trim().split(/\s+/))
     .filter(([id, status]) => id && status === 'device')
     .map(([id]) => id);
-}
-
-function listAvds() {
-  const result = spawnSync(emulator, ['-list-avds'], { encoding: 'utf8' });
-  return (result.stdout || '').trim().split('\n').filter(Boolean);
 }
 
 function isBootCompleted() {
@@ -121,19 +119,18 @@ function startEmulator(avd) {
     return;
   }
 
-  const avds = listAvds();
-  const avd =
-    process.env.ANDROID_AVD ||
-    avds.find((a) => a.includes('Medium_Phone')) ||
-    avds[0];
+  const avd = pickAvd(emulator);
 
   if (!avd) {
     console.error('No AVD found. Create one in Android Studio → Device Manager.');
+    console.error('  On Intel/AMD PCs use a system image with ABI x86_64 (not arm64).');
     process.exit(1);
   }
 
+  const abi = readAvdAbi(avd);
+
   console.log('No device connected. Starting emulator...');
-  console.log(`  AVD: ${avd}`);
+  console.log(`  AVD: ${avd}${abi ? ` (${abi})` : ''}`);
   console.log('  Tip: set ANDROID_AVD=Pixel_9a to pick another AVD');
   console.log('  Tip: plug in a USB phone (USB debugging) and re-run to skip the emulator\n');
 
@@ -148,6 +145,13 @@ function startEmulator(avd) {
   if (!deviceId) {
     console.error('\nEmulator did not become ready in time.');
     console.error(`  Log: ${logFile}`);
+    const fatal = readEmulatorFatal(logFile);
+    if (fatal) console.error(`  ${fatal}`);
+    if (fatal && fatal.includes("'arm'")) {
+      console.error(
+        '  Your PC needs an x86_64 AVD (Android Studio → Device Manager → create Virtual Device → x86_64 system image).'
+      );
+    }
     console.error('\nTry:');
     console.error('  1. npm run android:emulator   (wait for home screen in the emulator window)');
     console.error('  2. npm run android');
