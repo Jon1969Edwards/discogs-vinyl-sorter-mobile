@@ -48,8 +48,9 @@ type CollectionScreenProps = {
 };
 
 function rowKey(item: ReleaseRow, index: number): string {
-  if (item.release_id != null) return `r-${item.release_id}`;
+  // instance_id is unique per copy in a folder; release_id can repeat.
   if (item.instance_id != null) return `i-${item.instance_id}`;
+  if (item.release_id != null) return `r-${item.release_id}`;
   return `row-${index}`;
 }
 

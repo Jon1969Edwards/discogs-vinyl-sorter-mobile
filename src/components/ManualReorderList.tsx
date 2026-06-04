@@ -17,8 +17,8 @@ import DraggableFlatList, {
 import type { ReleaseRow } from '../types';
 
 function rowKey(item: ReleaseRow, index: number): string {
-  if (item.release_id != null) return `r-${item.release_id}`;
   if (item.instance_id != null) return `i-${item.instance_id}`;
+  if (item.release_id != null) return `r-${item.release_id}`;
   return `row-${index}`;
 }
 
