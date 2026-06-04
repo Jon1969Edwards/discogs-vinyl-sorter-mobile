@@ -79,7 +79,25 @@ Use this if you **do not** have a USB cable handy or local Gradle fails. Expo bu
 ```powershell
 npm install -g eas-cli
 eas login
+eas whoami
 ```
+
+### 1b. Permission denied on build?
+
+If you see `Entity not authorized` for project id `1658702c-...`, the repo is linked to **`jonathan-charles-edwards`** but you are logged in as someone else.
+
+Pick one:
+
+- **Same person, wrong login:** `eas logout` → `eas login` with the account that owns that Expo project.
+- **Your own Expo account (typical):** re-link the app (once):
+
+```powershell
+cd F:\Dev\discogs-vinyl-sorter-mobile
+# Remove "owner" and extra.eas.projectId from app.json (or run the script below), then:
+eas init
+```
+
+Answer the prompts to **create a new project** under your user. Then continue with the build.
 
 ### 2. Build development client
 
