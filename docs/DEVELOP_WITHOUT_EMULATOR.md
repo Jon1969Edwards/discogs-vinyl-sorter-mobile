@@ -124,7 +124,7 @@ Rebuild the dev client only when you change native dependencies or `app.json` pl
 
 ### Red screen: `RNGestureHandlerModule could not be found`
 
-The APK was built from an outdated `android/` tree (native modules not linked), or you used **Expo Go** instead of **Discogs Vinyl Sorter**.
+The APK was built from an outdated `android/` tree (native modules not linked), or you used **Expo Go** instead of **Discogs Vinyl Sorter**. This project requires **`newArchEnabled=true`** (Reanimated 4.x); do not set it to `false`.
 
 1. Uninstall both **Expo Go** and **Discogs Vinyl Sorter** on the phone.
 2. Rebuild with a clean cache:
