@@ -61,6 +61,18 @@ src/
 | `npm run android:device` | Build & run on USB/Wi‑Fi phone only (never starts emulator) |
 | `npm run ios`     | Open in iOS simulator   |
 
+## Release and testing
+
+| Doc | Purpose |
+|-----|---------|
+| [docs/SMOKE_TEST_CHECKLIST.md](./docs/SMOKE_TEST_CHECKLIST.md) | Manual device checks before release |
+| [docs/EAS_RELEASE.md](./docs/EAS_RELEASE.md) | Standalone APK/AAB via EAS (`preview` / `production`) |
+| [docs/STORE_LISTING.md](./docs/STORE_LISTING.md) | Play Store listing draft |
+| [docs/PRIVACY_POLICY.md](./docs/PRIVACY_POLICY.md) | Privacy policy draft |
+| [MOBILE_PARITY_HANDOFF.md](./MOBILE_PARITY_HANDOFF.md) | Parity status and architecture |
+
+Run `npm test` (33 tests) before merging. Enable **Show prices in list** in Settings to see marketplace prices on collection rows.
+
 ## Related
 
 - **Windows/Desktop app**: See sibling folder `discogs-vinyl-sorter-windows`

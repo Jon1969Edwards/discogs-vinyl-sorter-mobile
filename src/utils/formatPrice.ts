@@ -7,6 +7,29 @@ const CURRENCY_SYMBOL: Partial<Record<string, string>> = {
   JPY: '¥',
 };
 
+import type { ReleaseRow } from '../types';
+
+/** Compact list/export-style price line for a collection row. */
+export function formatListPrice(
+  row: ReleaseRow,
+  defaultCurrency: string,
+  showPrice: boolean
+): string | null {
+  if (!showPrice) return null;
+  if (
+    row.lowest_price != null &&
+    row.num_for_sale != null &&
+    row.num_for_sale > 0
+  ) {
+    const cur = row.price_currency || defaultCurrency;
+    return `${formatMarketplacePrice(row.lowest_price, cur)}+ (${row.num_for_sale})`;
+  }
+  if (showPrice && row.lowest_price == null) {
+    return 'Not listed';
+  }
+  return null;
+}
+
 export function formatMarketplacePrice(
   value: number | null | undefined,
   currency = 'USD'

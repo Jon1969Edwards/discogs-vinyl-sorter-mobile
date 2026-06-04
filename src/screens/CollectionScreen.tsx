@@ -23,6 +23,7 @@ import { useCollection } from '../hooks/useCollection';
 import { useCollectionWatch } from '../hooks/useCollectionWatch';
 import { useSettings } from '../context/SettingsContext';
 import { sortRows, getSectionLetter } from '../utils';
+import { formatListPrice } from '../utils/formatPrice';
 import { releaseRowKey } from '../utils/releaseRowKey';
 import { GUI_BUILD_SORT } from '../types';
 import {
@@ -76,10 +77,16 @@ function ReorderListLoader(props: ManualReorderListProps) {
 function AlbumRow({
   item,
   onPress,
+  showPrices,
+  currency,
 }: {
   item: ReleaseRow;
   onPress: () => void;
+  showPrices: boolean;
+  currency: string;
 }) {
+  const priceLine = formatListPrice(item, currency, showPrices);
+
   return (
     <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
       {item.thumb_url ? (
@@ -97,6 +104,11 @@ function AlbumRow({
         {(item.year != null || item.country) ? (
           <Text style={styles.meta} numberOfLines={1}>
             {[item.year, item.country].filter((v) => v != null && v !== '').join(' • ')}
+          </Text>
+        ) : null}
+        {priceLine ? (
+          <Text style={styles.priceMeta} numberOfLines={1}>
+            {priceLine}
           </Text>
         ) : null}
       </View>
@@ -432,6 +444,8 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
           renderItem={({ item }) => (
             <AlbumRow
               item={item}
+              showPrices={settings.show_prices}
+              currency={settings.currency}
               onPress={() => navigation.navigate('AlbumDetail', { release: item })}
             />
           )}
@@ -455,6 +469,8 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
           renderItem={({ item }) => (
             <AlbumRow
               item={item}
+              showPrices={settings.show_prices}
+              currency={settings.currency}
               onPress={() => navigation.navigate('AlbumDetail', { release: item })}
             />
           )}
@@ -625,6 +641,11 @@ const styles = StyleSheet.create({
   meta: {
     fontSize: 12,
     color: '#666',
+    marginTop: 2,
+  },
+  priceMeta: {
+    fontSize: 12,
+    color: '#e94560',
     marginTop: 2,
   },
   empty: {
