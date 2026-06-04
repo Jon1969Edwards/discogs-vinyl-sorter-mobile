@@ -2,7 +2,7 @@
  * Album detail screen – full release info, link to Discogs.
  */
 
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -10,8 +10,17 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { ReleaseRow } from '../types';
+import { useSettings } from '../context/SettingsContext';
+import {
+  createDiscogsClient,
+  fetchMarketplaceStats,
+  getStoredCredentials,
+} from '../services';
+import { formatMarketplacePrice } from '../utils/formatPrice';
 import { openDiscogsUrl } from '../utils/discogsLinking';
 
 type AlbumDetailScreenProps = {
@@ -19,13 +28,48 @@ type AlbumDetailScreenProps = {
   navigation: { goBack: () => void };
 };
 
-function formatPrice(value: number | null | undefined): string {
-  if (value == null || value === 0) return '—';
-  return `$${value.toFixed(2)}`;
-}
-
 export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps) {
-  const { release } = route.params;
+  const { settings, loaded: settingsLoaded } = useSettings();
+  const [release, setRelease] = useState(route.params.release);
+  const [priceLoading, setPriceLoading] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      const releaseId = route.params.release.release_id;
+      if (!releaseId || !settingsLoaded) return;
+
+      let cancelled = false;
+      setPriceLoading(true);
+
+      void (async () => {
+        try {
+          const credentials = await getStoredCredentials();
+          if (!credentials || cancelled) return;
+          const client = createDiscogsClient(credentials);
+          const stats = await fetchMarketplaceStats(
+            client,
+            releaseId,
+            settings.currency
+          );
+          if (cancelled) return;
+          setRelease((prev) => ({
+            ...prev,
+            lowest_price: stats.lowestPrice,
+            num_for_sale: stats.numForSale,
+            price_currency: stats.currency,
+          }));
+        } finally {
+          if (!cancelled) setPriceLoading(false);
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [route.params.release.release_id, settings.currency, settingsLoaded])
+  );
+
+  const priceCurrency = release.price_currency || settings.currency;
 
   return (
     <View style={styles.wrapper}>
@@ -70,10 +114,35 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
         <InfoRow label="Catalog" value={release.catno || '—'} />
       </View>
 
-      {(release.lowest_price != null || release.median_price != null) && (
+      {(release.lowest_price != null ||
+        release.median_price != null ||
+        priceLoading) && (
         <View style={styles.section}>
-          <InfoRow label="Lowest" value={formatPrice(release.lowest_price)} />
-          <InfoRow label="Median" value={formatPrice(release.median_price)} />
+          {priceLoading ? (
+            <View style={styles.priceLoadingRow}>
+              <ActivityIndicator size="small" color="#e94560" />
+              <Text style={styles.priceLoadingText}>
+                Loading {settings.currency} price…
+              </Text>
+            </View>
+          ) : (
+            <>
+              <InfoRow
+                label="Lowest"
+                value={formatMarketplacePrice(
+                  release.lowest_price,
+                  priceCurrency
+                )}
+              />
+              <InfoRow
+                label="Median"
+                value={formatMarketplacePrice(
+                  release.median_price,
+                  priceCurrency
+                )}
+              />
+            </>
+          )}
         </View>
       )}
 
@@ -176,6 +245,16 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  priceLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+  },
+  priceLoadingText: {
+    color: '#888',
+    fontSize: 14,
   },
   infoRow: {
     flexDirection: 'row',

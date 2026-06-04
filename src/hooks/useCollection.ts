@@ -235,6 +235,76 @@ export function useCollection() {
     setState({ status: 'idle' });
   }, []);
 
+  /** Re-fetch marketplace prices in the current settings currency (no full collection reload). */
+  const repriceCollection = useCallback(
+    async (credentials: DiscogsCredentials) => {
+      const settings = await loadSettings();
+      const needPrices =
+        settings.show_prices ||
+        settings.sort_by === 'price_asc' ||
+        settings.sort_by === 'price_desc';
+
+      setState((prev) => {
+        if (prev.status !== 'success' || !needPrices) return prev;
+
+        const { rows, username, itemCount } = prev;
+
+        void (async () => {
+          try {
+            const client = createDiscogsClient(credentials);
+            await attachPricesToRows(
+              client,
+              rows,
+              settings.currency,
+              (done, total) => {
+                setState((p) =>
+                  p.status === 'success' && p.username === username
+                    ? {
+                        ...p,
+                        pricesLoading: true,
+                        priceProgress: total > 0 ? done / total : undefined,
+                      }
+                    : p
+                );
+              }
+            );
+
+            let processed = sortRows(
+              rows,
+              GUI_BUILD_SORT.variousPolicy,
+              settings.sort_by as SortBy
+            );
+            processed = await applyManualOrder(processed);
+            await saveCachedRows(username, processed);
+
+            setState({
+              status: 'success',
+              rows: processed,
+              username,
+              itemCount,
+              stale: false,
+              pricesLoading: false,
+              priceProgress: undefined,
+            });
+          } catch {
+            setState((p) =>
+              p.status === 'success' && p.username === username
+                ? { ...p, pricesLoading: false, priceProgress: undefined }
+                : p
+            );
+          }
+        })();
+
+        return {
+          ...prev,
+          pricesLoading: true,
+          priceProgress: 0,
+        };
+      });
+    },
+    []
+  );
+
   const refreshCollection = useCallback(
     async (credentials: DiscogsCredentials) => {
       await fetchCollection(credentials);
@@ -242,5 +312,11 @@ export function useCollection() {
     [fetchCollection]
   );
 
-  return { state, fetchCollection, refreshCollection, reset };
+  return {
+    state,
+    fetchCollection,
+    refreshCollection,
+    repriceCollection,
+    reset,
+  };
 }

@@ -106,7 +106,8 @@ function AlbumRow({
 
 export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProps) {
   const { settings, loaded } = useSettings();
-  const { state, fetchCollection, refreshCollection, reset } = useCollection();
+  const { state, fetchCollection, refreshCollection, repriceCollection, reset } =
+    useCollection();
   const [credentials, setCredentials] = useState<import('../services').DiscogsCredentials | null>(null);
   const [search, setSearch] = useState('');
   const [exporting, setExporting] = useState(false);
@@ -144,15 +145,32 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
 
   useEffect(() => {
     if (
-      hasFetched.current &&
-      prevSettingsKey.current !== null &&
-      prevSettingsKey.current !== settingsKey &&
-      credentials
+      !hasFetched.current ||
+      prevSettingsKey.current === null ||
+      prevSettingsKey.current === settingsKey ||
+      !credentials
     ) {
+      prevSettingsKey.current = settingsKey;
+      return;
+    }
+
+    const prev = prevSettingsKey.current.split('|');
+    const next = settingsKey.split('|');
+    const onlyCurrencyChanged =
+      prev.length >= 4 &&
+      next.length >= 4 &&
+      prev[0] === next[0] &&
+      prev[1] === next[1] &&
+      prev[2] === next[2] &&
+      prev[3] !== next[3];
+
+    if (onlyCurrencyChanged && state.status === 'success') {
+      void repriceCollection(credentials);
+    } else {
       reset();
     }
     prevSettingsKey.current = settingsKey;
-  }, [settingsKey, credentials, reset]);
+  }, [settingsKey, credentials, reset, repriceCollection, state.status]);
 
   const onDiscogsCountChanged = useCallback(() => {
     reset();
