@@ -4,6 +4,8 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start --dev-client",
+    "start:lan": "expo start --dev-client --lan",
+    "start:tunnel": "expo start --dev-client --tunnel",
     "postinstall": "node scripts/fix-nested-deps.js",
     "android": "node scripts/run-android.js",
     "android:device": "node scripts/run-android.js --device-only",
