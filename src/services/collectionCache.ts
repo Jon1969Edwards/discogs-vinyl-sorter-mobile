@@ -62,6 +62,57 @@ export async function setCacheUsername(username: string): Promise<void> {
   }
 }
 
+export type FreshPriceEntry = {
+  lowest: number | null;
+  numForSale: number | null;
+};
+
+/** All non-stale cached prices for a currency (single AsyncStorage read). */
+export async function getFreshPriceEntries(
+  currency: string
+): Promise<Map<number, FreshPriceEntry>> {
+  const data = await load();
+  const now = Date.now();
+  const map = new Map<number, FreshPriceEntry>();
+  for (const [idStr, entry] of Object.entries(data.releases)) {
+    const p = entry.prices?.[currency];
+    if (!p) continue;
+    if (now - (p.fetched_at || 0) > PRICE_CACHE_MAX_AGE_MS) continue;
+    map.set(Number(idStr), {
+      lowest: p.lowest_price ?? null,
+      numForSale: p.num_for_sale ?? null,
+    });
+  }
+  return map;
+}
+
+/** Persist many price updates in one read/write (avoids 162 separate saves). */
+export async function batchSetCachedPrices(
+  updates: Array<{
+    releaseId: number;
+    lowest: number | null;
+    numForSale: number | null;
+  }>,
+  currency: string
+): Promise<void> {
+  if (updates.length === 0) return;
+  const data = await load();
+  const now = Date.now();
+  for (const u of updates) {
+    const key = String(u.releaseId);
+    if (!data.releases[key]) {
+      data.releases[key] = { cached_at: now };
+    }
+    if (!data.releases[key].prices) data.releases[key].prices = {};
+    data.releases[key].prices![currency] = {
+      lowest_price: u.lowest,
+      num_for_sale: u.numForSale,
+      fetched_at: now,
+    };
+  }
+  await save(data);
+}
+
 export async function getCachedPrice(
   releaseId: number,
   currency: string

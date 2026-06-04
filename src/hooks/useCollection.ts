@@ -45,6 +45,9 @@ export type CollectionState =
       username: string;
       stale?: boolean;
       itemCount?: number;
+      /** Marketplace prices still loading in the background */
+      pricesLoading?: boolean;
+      priceProgress?: number;
     };
 
 export function useCollection() {
@@ -106,8 +109,12 @@ export function useCollection() {
           settings.show_prices ||
           settings.sort_by === 'price_asc' ||
           settings.sort_by === 'price_desc';
+        const sortByPrice =
+          settings.sort_by === 'price_asc' ||
+          settings.sort_by === 'price_desc';
+        const deferPrices = needPrices && !sortByPrice;
 
-        if (needPrices) {
+        if (needPrices && sortByPrice) {
           setState({
             status: 'loading',
             message: 'Fetching marketplace prices…',
@@ -145,6 +152,58 @@ export function useCollection() {
         }
 
         await saveCachedRows(identity.username, processed);
+
+        if (deferPrices) {
+          setState({
+            status: 'success',
+            rows: processed,
+            username: identity.username,
+            itemCount,
+            stale: false,
+            pricesLoading: true,
+            priceProgress: 0,
+          });
+
+          void attachPricesToRows(
+            client,
+            processed,
+            settings.currency,
+            (done, total) => {
+              setState((prev) =>
+                prev.status === 'success' &&
+                prev.username === identity.username
+                  ? {
+                      ...prev,
+                      priceProgress: total > 0 ? done / total : undefined,
+                    }
+                  : prev
+              );
+            }
+          )
+            .then(async () => {
+              await saveCachedRows(identity.username, processed);
+              setState((prev) =>
+                prev.status === 'success' &&
+                prev.username === identity.username
+                  ? {
+                      ...prev,
+                      rows: processed,
+                      pricesLoading: false,
+                      priceProgress: undefined,
+                    }
+                  : prev
+              );
+            })
+            .catch(() => {
+              setState((prev) =>
+                prev.status === 'success' &&
+                prev.username === identity.username
+                  ? { ...prev, pricesLoading: false, priceProgress: undefined }
+                  : prev
+              );
+            });
+          return;
+        }
 
         setState({
           status: 'success',

@@ -344,6 +344,27 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
         </TouchableOpacity>
       ) : null}
 
+      {state.pricesLoading ? (
+        <View style={styles.pricesBanner}>
+          <Text style={styles.pricesBannerText}>
+            Updating marketplace prices…
+            {state.priceProgress != null
+              ? ` ${Math.round(state.priceProgress * 100)}%`
+              : ''}
+          </Text>
+          {state.priceProgress != null ? (
+            <View style={styles.pricesProgressTrack}>
+              <View
+                style={[
+                  styles.pricesProgressFill,
+                  { width: `${state.priceProgress * 100}%` },
+                ]}
+              />
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
       {reorderMode ? (
         <Text style={styles.reorderHint}>Long-press a row, then drag to set shelf order</Text>
       ) : null}
@@ -455,6 +476,28 @@ const styles = StyleSheet.create({
   staleBannerAction: {
     fontWeight: '700',
     textDecorationLine: 'underline',
+  },
+  pricesBanner: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginBottom: 4,
+    backgroundColor: 'rgba(233, 69, 96, 0.12)',
+  },
+  pricesBannerText: {
+    color: '#e94560',
+    fontSize: 13,
+    marginBottom: 6,
+  },
+  pricesProgressTrack: {
+    height: 3,
+    backgroundColor: '#252542',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  pricesProgressFill: {
+    height: '100%',
+    backgroundColor: '#e94560',
+    borderRadius: 2,
   },
   reorderHint: {
     color: '#888',

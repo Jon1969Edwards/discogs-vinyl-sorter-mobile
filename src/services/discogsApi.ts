@@ -12,6 +12,10 @@ import {
   DISCOGS_CONSUMER_SECRET,
 } from '@env';
 import type { DiscogsCredentials } from './auth';
+import {
+  batchSetCachedPrices,
+  getFreshPriceEntries,
+} from './collectionCache';
 
 const API_BASE = 'https://api.discogs.com';
 const USER_AGENT = 'DiscogsVinylSorter/1.0 (https://github.com/discogs-vinyl-sorter-mobile)';
@@ -365,6 +369,27 @@ export async function getCollectionCount(
   return data.pagination?.items ?? 0;
 }
 
+const PRICE_FETCH_CONCURRENCY = 6;
+
+async function runWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<void>
+): Promise<void> {
+  if (items.length === 0) return;
+  let next = 0;
+  const poolSize = Math.min(concurrency, items.length);
+  await Promise.all(
+    Array.from({ length: poolSize }, async () => {
+      while (true) {
+        const i = next++;
+        if (i >= items.length) break;
+        await worker(items[i]);
+      }
+    })
+  );
+}
+
 export async function attachPricesToRows(
   client: AxiosInstance,
   rows: import('../types').ReleaseRow[],
@@ -374,8 +399,33 @@ export async function attachPricesToRows(
   const withIds = rows.filter((r) => r.release_id != null);
   const total = withIds.length;
   let done = 0;
+  const bump = () => {
+    done += 1;
+    onProgress?.(done, total);
+  };
+
+  const freshCache = await getFreshPriceEntries(currency);
+  const toFetch: typeof withIds = [];
 
   for (const row of withIds) {
+    const cached = freshCache.get(row.release_id!);
+    if (cached) {
+      row.lowest_price = cached.lowest;
+      row.num_for_sale = cached.numForSale;
+      row.price_currency = currency;
+      bump();
+    } else {
+      toFetch.push(row);
+    }
+  }
+
+  const pendingUpdates: Array<{
+    releaseId: number;
+    lowest: number | null;
+    numForSale: number | null;
+  }> = [];
+
+  await runWithConcurrency(toFetch, PRICE_FETCH_CONCURRENCY, async (row) => {
     const stats = await fetchMarketplaceStats(
       client,
       row.release_id!,
@@ -384,9 +434,15 @@ export async function attachPricesToRows(
     row.lowest_price = stats.lowestPrice;
     row.num_for_sale = stats.numForSale;
     row.price_currency = stats.currency;
-    done += 1;
-    onProgress?.(done, total);
-  }
+    pendingUpdates.push({
+      releaseId: row.release_id!,
+      lowest: stats.lowestPrice,
+      numForSale: stats.numForSale,
+    });
+    bump();
+  });
+
+  await batchSetCachedPrices(pendingUpdates, currency);
 }
 
 export async function fetchMarketplaceStats(
