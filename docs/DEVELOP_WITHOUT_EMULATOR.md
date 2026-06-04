@@ -122,6 +122,20 @@ Open **Discogs Vinyl Sorter** on the phone. Ensure phone and PC are on the same 
 
 Rebuild the dev client only when you change native dependencies or `app.json` plugins — not for normal TS/React edits.
 
+### Red screen: `RNGestureHandlerModule could not be found`
+
+The APK was built from an outdated `android/` tree (native modules not linked), or you used **Expo Go** instead of **Discogs Vinyl Sorter**.
+
+1. Uninstall both **Expo Go** and **Discogs Vinyl Sorter** on the phone.
+2. Rebuild with a clean cache:
+
+```powershell
+eas build --profile development --platform android --clear-cache
+```
+
+3. Install only the **new** APK from that build page.
+4. `npm run start:lan` → connect with `http://YOUR_PC_IP:8081` (not `localhost`).
+
 ---
 
 ## Path D — Browser (limited)
