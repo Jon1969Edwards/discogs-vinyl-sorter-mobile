@@ -390,6 +390,7 @@ export function buildReleaseRow(
     format_str: fmtDesc,
     discogs_url: url,
     notes: item.notes || '',
+    instance_id: item.instance_id ?? null,
     release_id: relId ?? null,
     master_id: basic.master_id ?? null,
     sort_artist: sortArtist,

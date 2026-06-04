@@ -21,6 +21,7 @@ import { useCollection } from '../hooks/useCollection';
 import { useCollectionWatch } from '../hooks/useCollectionWatch';
 import { useSettings } from '../context/SettingsContext';
 import { sortRows, getSectionLetter } from '../utils';
+import { releaseRowKey } from '../utils/releaseRowKey';
 import { GUI_BUILD_SORT } from '../types';
 import {
   getStoredCredentials,
@@ -47,12 +48,6 @@ type CollectionScreenProps = {
   onSignOut: () => void;
 };
 
-function rowKey(item: ReleaseRow, index: number): string {
-  // instance_id is unique per copy in a folder; release_id can repeat.
-  if (item.instance_id != null) return `i-${item.instance_id}`;
-  if (item.release_id != null) return `r-${item.release_id}`;
-  return `row-${index}`;
-}
 
 function ReorderListLoader(props: ManualReorderListProps) {
   const [List, setList] = useState<React.ComponentType<ManualReorderListProps> | null>(
@@ -402,7 +397,7 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
       ) : showDividers && sections.length > 0 && Platform.OS !== 'web' ? (
         <SectionList
           sections={sections}
-          keyExtractor={(item, index) => rowKey(item, index)}
+          keyExtractor={(item, index) => releaseRowKey(item, index)}
           renderItem={({ item }) => (
             <AlbumRow
               item={item}
@@ -424,7 +419,7 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
       ) : (
         <FlatList
           data={filteredRows}
-          keyExtractor={(item, index) => rowKey(item, index)}
+          keyExtractor={(item, index) => releaseRowKey(item, index)}
           renderItem={({ item }) => (
             <AlbumRow
               item={item}

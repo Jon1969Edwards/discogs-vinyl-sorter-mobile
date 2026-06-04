@@ -15,12 +15,7 @@ import DraggableFlatList, {
   type RenderItemParams,
 } from 'react-native-draggable-flatlist';
 import type { ReleaseRow } from '../types';
-
-function rowKey(item: ReleaseRow, index: number): string {
-  if (item.instance_id != null) return `i-${item.instance_id}`;
-  if (item.release_id != null) return `r-${item.release_id}`;
-  return `row-${index}`;
-}
+import { releaseRowKey } from '../utils/releaseRowKey';
 
 function ReorderRow({ item, drag }: { item: ReleaseRow; drag?: () => void }) {
   return (
@@ -69,7 +64,7 @@ export function ManualReorderList({ rows, onRowsChange }: ManualReorderListProps
     <DraggableFlatList
       data={rows}
       onDragEnd={({ data }) => onRowsChange(data)}
-      keyExtractor={(item, index) => rowKey(item, index)}
+      keyExtractor={(item, index) => releaseRowKey(item, index)}
       renderItem={renderItem}
       ListEmptyComponent={<Text style={styles.empty}>No LPs in collection</Text>}
     />
