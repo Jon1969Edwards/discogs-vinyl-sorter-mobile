@@ -10,13 +10,15 @@ import {
   FlatList,
   SectionList,
   Image,
-  TextInput,
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import type { ReleaseRow } from '../types';
 import type { ManualReorderListProps } from '../components/ManualReorderList';
+import { CollectionHeader } from '../components/CollectionHeader';
+import { CollectionSearchBar } from '../components/CollectionSearchBar';
 import { useCollection } from '../hooks/useCollection';
 import { useCollectionWatch } from '../hooks/useCollectionWatch';
 import { useSettings } from '../context/SettingsContext';
@@ -104,7 +106,7 @@ function AlbumRow({
 
 export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProps) {
   const { settings, loaded } = useSettings();
-  const { state, fetchCollection, reset } = useCollection();
+  const { state, fetchCollection, refreshCollection, reset } = useCollection();
   const [credentials, setCredentials] = useState<import('../services').DiscogsCredentials | null>(null);
   const [search, setSearch] = useState('');
   const [exporting, setExporting] = useState(false);
@@ -256,13 +258,39 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
     reset();
   }, [reset]);
 
+  const handleRefresh = useCallback(() => {
+    if (credentials) void refreshCollection(credentials);
+  }, [credentials, refreshCollection]);
+
+  const isRefreshing =
+    state.status === 'loading' && hasFetched.current;
+
+  const refreshControl = (
+    <RefreshControl
+      refreshing={isRefreshing}
+      onRefresh={handleRefresh}
+      tintColor="#e94560"
+      colors={['#e94560']}
+      enabled={!reorderMode && !!credentials}
+    />
+  );
+
   if (state.status === 'loading') {
+    const progress =
+      'progress' in state && state.progress != null ? state.progress : null;
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#e94560" />
         <Text style={styles.loadingText}>
           {state.message || 'Loading collection…'}
         </Text>
+        {progress != null ? (
+          <View style={styles.progressTrack}>
+            <View
+              style={[styles.progressFill, { width: `${progress * 100}%` }]}
+            />
+          </View>
+        ) : null}
       </View>
     );
   }
@@ -294,73 +322,37 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>
-          {state.username}'s LPs ({state.rows.length})
-          {manualOrderActive ? ' · custom order' : ''}
-        </Text>
-        <View style={styles.headerActions}>
-          {reorderMode ? (
-            <>
-              <TouchableOpacity onPress={() => void finishReorder()} style={styles.refreshBtn}>
-                <Text style={styles.refreshText}>Done</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => void resetShelfOrder()} style={styles.refreshBtn}>
-                <Text style={styles.refreshText}>Reset</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <TouchableOpacity
-                onPress={enterReorderMode}
-                style={styles.refreshBtn}
-                disabled={!!search.trim()}
-              >
-                <Text
-                  style={[
-                    styles.refreshText,
-                    !!search.trim() && styles.actionDisabled,
-                  ]}
-                >
-                  Reorder
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('Settings')}
-                style={styles.refreshBtn}
-              >
-                <Text style={styles.refreshText}>Settings</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => credentials && reset()}
-                style={styles.refreshBtn}
-              >
-                <Text style={styles.refreshText}>Refresh</Text>
-              </TouchableOpacity>
-            </>
-          )}
-          <TouchableOpacity onPress={handleSignOut}>
-            <Text style={styles.signOut}>Sign Out</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <CollectionHeader
+        lpCount={state.rows.length}
+        username={state.username}
+        manualOrderActive={manualOrderActive}
+        reorderMode={reorderMode}
+        searchActive={!!search.trim()}
+        onReorder={enterReorderMode}
+        onSettings={() => navigation.navigate('Settings')}
+        onRefresh={handleRefresh}
+        onSignOut={() => void handleSignOut()}
+        onFinishReorder={() => void finishReorder()}
+        onResetShelfOrder={() => void resetShelfOrder()}
+      />
 
       {state.stale ? (
-        <Text style={styles.staleBanner}>
-          Showing cached collection — tap Refresh to sync
-        </Text>
+        <TouchableOpacity style={styles.staleBanner} onPress={handleRefresh}>
+          <Text style={styles.staleBannerText}>
+            Cached collection · <Text style={styles.staleBannerAction}>Sync now</Text>
+          </Text>
+        </TouchableOpacity>
       ) : null}
 
       {reorderMode ? (
         <Text style={styles.reorderHint}>Long-press a row, then drag to set shelf order</Text>
       ) : null}
 
-      <TextInput
-        style={styles.search}
-        placeholder="Search artist or title..."
-        placeholderTextColor="#666"
+      <CollectionSearchBar
         value={search}
         onChangeText={setSearch}
+        filteredCount={filteredRows.length}
+        totalCount={catalogRows.length}
         editable={!reorderMode}
       />
 
@@ -410,6 +402,7 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
             </View>
           )}
           stickySectionHeadersEnabled
+          refreshControl={refreshControl}
           ListEmptyComponent={
             <Text style={styles.empty}>
               {search ? 'No matches' : 'No LPs in collection'}
@@ -426,6 +419,7 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
               onPress={() => navigation.navigate('AlbumDetail', { release: item })}
             />
           )}
+          refreshControl={refreshControl}
           ListEmptyComponent={
             <Text style={styles.empty}>
               {search ? 'No matches' : 'No LPs in collection'}
@@ -448,43 +442,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    paddingTop: 48,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#eee',
-    marginRight: 8,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flexShrink: 0,
-  },
-  refreshBtn: {},
-  refreshText: {
-    color: '#aaa',
-    fontSize: 14,
-  },
-  actionDisabled: {
-    opacity: 0.4,
-  },
-  signOut: {
-    color: '#e94560',
-    fontSize: 14,
-  },
   staleBanner: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginBottom: 4,
+    backgroundColor: 'rgba(240, 173, 78, 0.12)',
+  },
+  staleBannerText: {
     color: '#f0ad4e',
     fontSize: 13,
-    paddingHorizontal: 16,
-    marginBottom: 8,
+  },
+  staleBannerAction: {
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   reorderHint: {
     color: '#888',
@@ -492,14 +462,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 8,
   },
-  search: {
+  progressTrack: {
+    width: '80%',
+    maxWidth: 280,
+    height: 4,
     backgroundColor: '#252542',
-    borderRadius: 8,
-    padding: 12,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    fontSize: 16,
-    color: '#fff',
+    borderRadius: 2,
+    marginTop: 20,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#e94560',
+    borderRadius: 2,
   },
   exportBar: {
     flexDirection: 'row',
@@ -535,6 +510,8 @@ const styles = StyleSheet.create({
   loadingText: {
     color: '#aaa',
     marginTop: 16,
+    textAlign: 'center',
+    paddingHorizontal: 24,
   },
   errorText: {
     color: '#e94560',

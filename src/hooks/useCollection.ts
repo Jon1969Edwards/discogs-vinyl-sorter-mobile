@@ -37,7 +37,7 @@ import { syncWishlistFromDiscogs } from '../services/wishlist';
 
 export type CollectionState =
   | { status: 'idle' }
-  | { status: 'loading'; message?: string }
+  | { status: 'loading'; message?: string; progress?: number }
   | { status: 'error'; error: string }
   | {
       status: 'success';
@@ -75,21 +75,21 @@ export function useCollection() {
         await setManualOrderUsername(identity.username);
 
         const items: DiscogsCollectionRelease[] = [];
-        let count = 0;
         for await (const item of iterateCollection(
           client,
           identity.username,
           0,
-          settings.per_page
-        )) {
-          items.push(item);
-          count += 1;
-          if (count % 50 === 0) {
+          settings.per_page,
+          undefined,
+          ({ page, totalPages, loadedCount }) => {
             setState({
               status: 'loading',
-              message: `Loaded ${count} releases…`,
+              message: `Fetching page ${page} of ${totalPages}… (${loadedCount} releases)`,
+              progress: Math.min(1, page / totalPages),
             });
           }
+        )) {
+          items.push(item);
         }
 
         const allRows = collectAllRows(items, {
@@ -111,6 +111,7 @@ export function useCollection() {
           setState({
             status: 'loading',
             message: 'Fetching marketplace prices…',
+            progress: undefined,
           });
           await attachPricesToRows(
             client,
@@ -120,6 +121,7 @@ export function useCollection() {
               setState({
                 status: 'loading',
                 message: `Prices ${done}/${total}…`,
+                progress: total > 0 ? done / total : undefined,
               });
             }
           );
@@ -174,5 +176,12 @@ export function useCollection() {
     setState({ status: 'idle' });
   }, []);
 
-  return { state, fetchCollection, reset };
+  const refreshCollection = useCallback(
+    async (credentials: DiscogsCredentials) => {
+      await fetchCollection(credentials);
+    },
+    [fetchCollection]
+  );
+
+  return { state, fetchCollection, refreshCollection, reset };
 }

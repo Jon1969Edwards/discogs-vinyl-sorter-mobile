@@ -259,15 +259,23 @@ export async function fetchCollectionPage(
   );
 }
 
+export type CollectionPageProgress = {
+  page: number;
+  totalPages: number;
+  loadedCount: number;
+};
+
 export async function* iterateCollection(
   client: AxiosInstance,
   username: string,
   folderId = 0,
   perPage = 100,
-  maxPages?: number
+  maxPages?: number,
+  onPageLoaded?: (info: CollectionPageProgress) => void
 ): AsyncGenerator<DiscogsCollectionRelease> {
   let page = 1;
   let totalPages: number | null = null;
+  let loadedCount = 0;
 
   while (true) {
     const data = await fetchCollectionPage(
@@ -283,8 +291,15 @@ export async function* iterateCollection(
     }
 
     for (const item of data.releases ?? []) {
+      loadedCount += 1;
       yield item;
     }
+
+    onPageLoaded?.({
+      page,
+      totalPages: totalPages ?? 1,
+      loadedCount,
+    });
 
     page += 1;
     if (maxPages !== undefined && page > maxPages) break;
