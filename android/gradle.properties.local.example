@@ -1,0 +1,7 @@
+# Local JDK override (optional, not used by EAS).
+# Prefer setting JAVA_HOME to a JDK 17 install instead of editing committed files.
+#
+# Windows (PowerShell, current session):
+#   $env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-17.0.18.8-hotspot"
+#
+# Or add org.gradle.java.home to %USERPROFILE%\.gradle\gradle.properties (your machine only).

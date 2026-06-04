@@ -108,6 +108,8 @@ eas build --profile development --platform android
 
 When the build finishes, open the link on your phone (or scan QR), download the **APK**, and install (allow “Install unknown apps” for the browser if asked).
 
+**Gradle failed on EAS with invalid `org.gradle.java.home`?** Remove any Windows JDK path from `android/gradle.properties` (committed file must not pin `C:/...`). Use `JAVA_HOME` locally instead; see `android/gradle.properties.local.example`.
+
 ### 3. Run Metro on your PC
 
 ```powershell
