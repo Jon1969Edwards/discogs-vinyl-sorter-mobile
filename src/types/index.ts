@@ -45,6 +45,37 @@ export type DividerMode = 'none' | 'letter' | 'abc';
 export type VariousPolicy = 'normal' | 'last' | 'title';
 export type SortBy = 'artist' | 'title' | 'year' | 'price_asc' | 'price_desc';
 
+/** Discogs marketplace `curr_abbr` values (API docs). */
+export type DiscogsCurrency =
+  | 'USD'
+  | 'GBP'
+  | 'EUR'
+  | 'CAD'
+  | 'AUD'
+  | 'JPY'
+  | 'CHF'
+  | 'MXN'
+  | 'BRL'
+  | 'NZD'
+  | 'SEK'
+  | 'ZAR';
+
+export const DISCOGS_CURRENCY_OPTIONS: { code: DiscogsCurrency; label: string }[] =
+  [
+    { code: 'USD', label: 'US Dollar' },
+    { code: 'GBP', label: 'British Pound' },
+    { code: 'EUR', label: 'Euro' },
+    { code: 'CAD', label: 'Canadian Dollar' },
+    { code: 'AUD', label: 'Australian Dollar' },
+    { code: 'JPY', label: 'Japanese Yen' },
+    { code: 'CHF', label: 'Swiss Franc' },
+    { code: 'MXN', label: 'Mexican Peso' },
+    { code: 'BRL', label: 'Brazilian Real' },
+    { code: 'NZD', label: 'New Zealand Dollar' },
+    { code: 'SEK', label: 'Swedish Krona' },
+    { code: 'ZAR', label: 'South African Rand' },
+  ];
+
 /** Windows Auto-Sort GUI build_service._collect_rows defaults */
 export const GUI_BUILD_SORT = {
   lastNameFirst: true,
@@ -60,7 +91,7 @@ export interface AppSettings {
   formats: string[];
   divider_mode: DividerMode;
   sort_by: SortBy;
-  currency: string;
+  currency: DiscogsCurrency;
   write_json: boolean;
   poll_seconds: number;
   show_prices: boolean;

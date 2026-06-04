@@ -11,7 +11,9 @@ import {
 import { useSettings } from '../hooks/useSettings';
 import type { DividerMode, SortBy } from '../types';
 import { FORMAT_FILTERS } from '../domain/formatFilter';
+import { CurrencyPicker } from '../components/CurrencyPicker';
 import { clearAllAuth } from '../services';
+import type { DiscogsCurrency } from '../types';
 
 const DIVIDER_OPTIONS: { id: DividerMode; label: string }[] = [
   { id: 'none', label: 'None' },
@@ -173,12 +175,12 @@ export function SettingsScreen({
       />
 
       <Text style={styles.sectionTitle}>Currency</Text>
-      <TextInput
-        style={styles.input}
-        autoCapitalize="characters"
-        maxLength={3}
+      <CurrencyPicker
         value={settings.currency}
-        onChangeText={(t) => update({ currency: t.toUpperCase().slice(0, 3) })}
+        onChange={async (currency: DiscogsCurrency) => {
+          await update({ currency });
+          onSettingsChanged?.();
+        }}
       />
 
       <Text style={styles.sectionTitle}>User-Agent (advanced)</Text>

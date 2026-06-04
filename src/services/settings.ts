@@ -3,8 +3,26 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { AppSettings, DividerMode, SortBy } from '../types';
-import { DEFAULT_SETTINGS } from '../types';
+import type {
+  AppSettings,
+  DiscogsCurrency,
+  DividerMode,
+  SortBy,
+} from '../types';
+import { DEFAULT_SETTINGS, DISCOGS_CURRENCY_OPTIONS } from '../types';
+
+const VALID_CURRENCIES = new Set(
+  DISCOGS_CURRENCY_OPTIONS.map((o) => o.code)
+);
+
+export function normalizeDiscogsCurrency(value: unknown): DiscogsCurrency {
+  const code = String(value ?? '')
+    .toUpperCase()
+    .slice(0, 3);
+  return VALID_CURRENCIES.has(code as DiscogsCurrency)
+    ? (code as DiscogsCurrency)
+    : DEFAULT_SETTINGS.currency;
+}
 
 const SETTINGS_KEY = 'discogs_app_settings';
 
@@ -17,6 +35,7 @@ export async function loadSettings(): Promise<AppSettings> {
       ...DEFAULT_SETTINGS,
       ...parsed,
       formats: Array.isArray(parsed.formats) ? parsed.formats : DEFAULT_SETTINGS.formats,
+      currency: normalizeDiscogsCurrency(parsed.currency),
     };
   } catch {
     return { ...DEFAULT_SETTINGS };
