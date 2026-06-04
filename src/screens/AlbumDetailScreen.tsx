@@ -20,6 +20,7 @@ import {
   fetchMarketplaceStats,
   getStoredCredentials,
 } from '../services';
+import { formatCollectionNotes } from '../utils/collectionNotes';
 import { formatMarketplacePrice } from '../utils/formatPrice';
 import { openDiscogsUrl } from '../utils/discogsLinking';
 
@@ -70,6 +71,7 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
   );
 
   const priceCurrency = release.price_currency || settings.currency;
+  const notesText = formatCollectionNotes(release.notes);
 
   return (
     <View style={styles.wrapper}>
@@ -146,10 +148,10 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
         </View>
       )}
 
-      {release.notes ? (
+      {notesText ? (
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Notes</Text>
-          <Text style={styles.notes}>{release.notes}</Text>
+          <Text style={styles.notes}>{notesText}</Text>
         </View>
       ) : null}
 

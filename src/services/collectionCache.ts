@@ -4,6 +4,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ReleaseRow } from '../types';
+import { formatCollectionNotes } from '../utils/collectionNotes';
 
 const CACHE_KEY = 'discogs_collection_cache';
 const ROWS_KEY = 'discogs_collection_rows_cache';
@@ -187,6 +188,7 @@ function deserializeRow(raw: Record<string, unknown>): ReleaseRow {
   const cats = raw.format_categories;
   return {
     ...(raw as ReleaseRow),
+    notes: formatCollectionNotes(raw.notes),
     format_categories: Array.isArray(cats)
       ? new Set(cats as string[])
       : undefined,

@@ -62,7 +62,7 @@ export interface DiscogsCollectionRelease {
     country?: string;
     resource_url: string;
   };
-  notes?: string;
+  notes?: string | Array<{ field_id: number; value: string }>;
 }
 
 export interface DiscogsCollectionResponse {

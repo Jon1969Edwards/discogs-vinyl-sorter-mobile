@@ -5,6 +5,7 @@
 import type { DiscogsCollectionRelease } from '../services/discogsApi';
 import type { ReleaseRow, SortBy, VariousPolicy } from '../types';
 import { GUI_BUILD_SORT } from '../types';
+import { formatCollectionNotes } from '../utils/collectionNotes';
 import { filterRowsByFormat } from './formatFilter';
 
 export type { SortBy, VariousPolicy };
@@ -389,7 +390,7 @@ export function buildReleaseRow(
     country: basic.country || '',
     format_str: fmtDesc,
     discogs_url: url,
-    notes: item.notes || '',
+    notes: formatCollectionNotes(item.notes),
     instance_id: item.instance_id ?? null,
     release_id: relId ?? null,
     master_id: basic.master_id ?? null,

@@ -9,8 +9,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { Image } from 'expo-image';
-import type { ReleaseRow } from '../types';
-import type { WishlistEntry } from '../types';
+import type { ReleaseRow, WishlistEntry } from '../types';
+import { formatCollectionNotes } from '../utils/collectionNotes';
 
 interface AlbumDetailModalProps {
   visible: boolean;
@@ -67,8 +67,10 @@ export function AlbumDetailModal({
             {priceText ? (
               <Text style={styles.meta}>Price: {priceText}</Text>
             ) : null}
-            {row.notes ? (
-              <Text style={styles.notes}>Notes: {row.notes}</Text>
+            {formatCollectionNotes(row.notes) ? (
+              <Text style={styles.notes}>
+                Notes: {formatCollectionNotes(row.notes)}
+              </Text>
             ) : null}
           </ScrollView>
 
