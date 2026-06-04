@@ -103,6 +103,9 @@ function startEmulator(avd) {
   return logFile;
 }
 
+const deviceOnly =
+  process.env.DEVICE_ONLY === '1' || process.argv.includes('--device-only');
+
 (async () => {
   resetAdb();
   await new Promise((r) => setTimeout(r, 2000));
@@ -120,6 +123,21 @@ function startEmulator(avd) {
     }
     runExpoAndroid();
     return;
+  }
+
+  if (deviceOnly) {
+    console.error('No Android device detected (adb status must be "device", not offline).');
+    console.error('');
+    console.error('Use a physical phone — no emulator required:');
+    console.error('  1. Phone: Settings → About → tap Build number 7× → Developer options');
+    console.error('  2. Enable USB debugging (and Wireless debugging if using Wi‑Fi)');
+    console.error('  3. USB cable → accept "Allow USB debugging" on the phone');
+    console.error('  4. Verify: adb devices   (should list one line ending in "device")');
+    console.error('  5. npm run android:device');
+    console.error('');
+    console.error('Or build the dev app in the cloud (no USB after install):');
+    console.error('  See docs/DEVELOP_WITHOUT_EMULATOR.md → "EAS cloud build"');
+    process.exit(1);
   }
 
   const avd = pickAvd(emulator);

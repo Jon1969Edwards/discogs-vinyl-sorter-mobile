@@ -40,22 +40,24 @@ Other hypervisors (VirtualBox, VMware, old HAXM) can block AEHD. Close them or u
 
 ---
 
-## Run the emulator without hypervisor (slower but works)
+## Run the emulator without hypervisor (often does not work)
 
-If AEHD cannot be fixed yet:
+On recent **x86_64** system images (API 30+), the emulator usually still needs **VT-x / AMD-V enabled in BIOS** and AEHD. Software-only mode (`-accel off`) may start briefly, then **crash** (`qemu-system-x86_64.exe`, `EXCEPTION_ACCESS_VIOLATION`) — see `android/emulator-last.log`.
+
+If AEHD cannot be fixed yet, you can try (no guarantee):
 
 ```powershell
 $env:ACCEL_OFF="1"
 npm run android:emulator
 ```
 
-Wait for the home screen, then:
+If the emulator window stays open and reaches the home screen:
 
 ```powershell
 npm run android
 ```
 
-First boot without acceleration can take **10+ minutes**.
+Without firmware virtualization, prefer a **physical phone** (below) instead of fighting the emulator.
 
 ---
 
