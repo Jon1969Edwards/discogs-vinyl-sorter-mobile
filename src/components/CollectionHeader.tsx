@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   Modal,
   Pressable,
 } from 'react-native';
+import { AppText } from './ui/AppText';
+import { colors, radius, spacing } from '../theme';
 
 export type CollectionHeaderProps = {
   lpCount: number;
@@ -20,6 +21,10 @@ export type CollectionHeaderProps = {
   onSignOut: () => void;
   onFinishReorder: () => void;
   onResetShelfOrder: () => void;
+  onExportTxt: () => void;
+  onExportCsv: () => void;
+  onExportJson: () => void;
+  exportDisabled?: boolean;
 };
 
 export function CollectionHeader({
@@ -34,6 +39,10 @@ export function CollectionHeader({
   onSignOut,
   onFinishReorder,
   onResetShelfOrder,
+  onExportTxt,
+  onExportCsv,
+  onExportJson,
+  exportDisabled = false,
 }: CollectionHeaderProps) {
   const [menuVisible, setMenuVisible] = useState(false);
 
@@ -46,18 +55,22 @@ export function CollectionHeader({
     <View style={styles.header}>
       <View style={styles.titleRow}>
         <View style={styles.titleBlock}>
-          <Text style={styles.title}>{lpCount} LPs</Text>
-          <Text style={styles.subtitle} numberOfLines={1}>
+          <AppText variant="title">{lpCount} LPs</AppText>
+          <AppText variant="caption" style={styles.subtitle} numberOfLines={1}>
             {subtitleParts.join(' · ')}
-          </Text>
+          </AppText>
         </View>
         {reorderMode ? (
           <View style={styles.reorderActions}>
             <TouchableOpacity onPress={onFinishReorder} style={styles.actionBtn}>
-              <Text style={styles.actionTextPrimary}>Done</Text>
+              <AppText variant="accent" style={styles.actionTextPrimary}>
+                Done
+              </AppText>
             </TouchableOpacity>
             <TouchableOpacity onPress={onResetShelfOrder} style={styles.actionBtn}>
-              <Text style={styles.actionText}>Reset</Text>
+              <AppText variant="bodySmall" style={styles.actionText}>
+                Reset
+              </AppText>
             </TouchableOpacity>
           </View>
         ) : (
@@ -66,7 +79,7 @@ export function CollectionHeader({
             onPress={() => setMenuVisible(true)}
             accessibilityLabel="More actions"
           >
-            <Text style={styles.menuIcon}>⋮</Text>
+            <AppText style={styles.menuIcon}>⋮</AppText>
           </TouchableOpacity>
         )}
       </View>
@@ -89,16 +102,19 @@ export function CollectionHeader({
               }}
               disabled={searchActive}
             >
-              <Text
+              <AppText
+                variant="body"
                 style={[
                   styles.menuItemText,
                   searchActive && styles.menuItemTextDisabled,
                 ]}
               >
                 Reorder shelf
-              </Text>
+              </AppText>
               {searchActive ? (
-                <Text style={styles.menuItemHint}>Clear search first</Text>
+                <AppText variant="caption" style={styles.menuItemHint}>
+                  Clear search first
+                </AppText>
               ) : null}
             </TouchableOpacity>
             <TouchableOpacity
@@ -108,7 +124,9 @@ export function CollectionHeader({
                 onSettings();
               }}
             >
-              <Text style={styles.menuItemText}>Settings</Text>
+              <AppText variant="body" style={styles.menuItemText}>
+                Settings
+              </AppText>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.menuItem}
@@ -117,7 +135,52 @@ export function CollectionHeader({
                 onRefresh();
               }}
             >
-              <Text style={styles.menuItemText}>Refresh collection</Text>
+              <AppText variant="body" style={styles.menuItemText}>
+                Refresh collection
+              </AppText>
+            </TouchableOpacity>
+            <View style={styles.menuDivider} />
+            <TouchableOpacity
+              style={[styles.menuItem, exportDisabled && styles.menuItemDisabled]}
+              onPress={() => {
+                if (!exportDisabled) {
+                  closeMenu();
+                  onExportTxt();
+                }
+              }}
+              disabled={exportDisabled}
+            >
+              <AppText variant="body" style={styles.menuItemText}>
+                Export TXT
+              </AppText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.menuItem, exportDisabled && styles.menuItemDisabled]}
+              onPress={() => {
+                if (!exportDisabled) {
+                  closeMenu();
+                  onExportCsv();
+                }
+              }}
+              disabled={exportDisabled}
+            >
+              <AppText variant="body" style={styles.menuItemText}>
+                Export CSV
+              </AppText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.menuItem, exportDisabled && styles.menuItemDisabled]}
+              onPress={() => {
+                if (!exportDisabled) {
+                  closeMenu();
+                  onExportJson();
+                }
+              }}
+              disabled={exportDisabled}
+            >
+              <AppText variant="body" style={styles.menuItemText}>
+                Export JSON
+              </AppText>
             </TouchableOpacity>
             <View style={styles.menuDivider} />
             <TouchableOpacity
@@ -127,7 +190,9 @@ export function CollectionHeader({
                 onSignOut();
               }}
             >
-              <Text style={styles.menuItemTextDanger}>Sign out</Text>
+              <AppText variant="accent" style={styles.menuItemTextDanger}>
+                Sign out
+              </AppText>
             </TouchableOpacity>
           </View>
         </Pressable>
@@ -138,9 +203,9 @@ export function CollectionHeader({
 
 const styles = StyleSheet.create({
   header: {
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
     paddingTop: 48,
-    paddingBottom: 12,
+    paddingBottom: spacing.md,
   },
   titleRow: {
     flexDirection: 'row',
@@ -149,85 +214,74 @@ const styles = StyleSheet.create({
   },
   titleBlock: {
     flex: 1,
-    marginRight: 12,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#eee',
+    marginRight: spacing.md,
   },
   subtitle: {
-    fontSize: 13,
-    color: '#888',
     marginTop: 2,
+    color: colors.textMuted,
   },
   menuButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    minWidth: 48,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   menuIcon: {
     fontSize: 28,
-    color: '#aaa',
+    color: colors.textSecondary,
     lineHeight: 32,
   },
   reorderActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: spacing.lg,
   },
   actionBtn: {
-    paddingVertical: 4,
+    paddingVertical: spacing.xs,
+    minHeight: 48,
+    justifyContent: 'center',
   },
   actionText: {
-    color: '#aaa',
-    fontSize: 15,
-    fontWeight: '600',
+    color: colors.textSecondary,
   },
-  actionTextPrimary: {
-    color: '#e94560',
-    fontSize: 15,
-    fontWeight: '600',
-  },
+  actionTextPrimary: {},
   menuBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-start',
     alignItems: 'flex-end',
     paddingTop: 96,
-    paddingRight: 16,
+    paddingRight: spacing.lg,
   },
   menuSheet: {
-    backgroundColor: '#252542',
-    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
     minWidth: 220,
     overflow: 'hidden',
   },
   menuItem: {
     paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
   },
   menuItemDisabled: {
     opacity: 0.5,
   },
   menuItemText: {
-    color: '#eee',
-    fontSize: 16,
+    color: colors.textPrimary,
   },
   menuItemTextDisabled: {
-    color: '#888',
+    color: colors.textMuted,
   },
   menuItemHint: {
-    color: '#666',
-    fontSize: 12,
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
   menuItemTextDanger: {
-    color: '#e94560',
-    fontSize: 16,
     fontWeight: '600',
   },
   menuDivider: {
     height: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.background,
   },
 });
