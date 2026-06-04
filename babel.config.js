@@ -1,5 +1,11 @@
+const fs = require('fs');
+const path = require('path');
+
 module.exports = function (api) {
-  api.cache(true);
+  const envPath = path.resolve(__dirname, '.env');
+  api.cache.using(() =>
+    fs.existsSync(envPath) ? fs.statSync(envPath).mtimeMs : 'no-env'
+  );
   return {
     presets: ['babel-preset-expo'],
     plugins: [
