@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,10 @@ import {
   Switch,
   TouchableOpacity,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSettings } from '../hooks/useSettings';
 import type { DividerMode, SortBy } from '../types';
 import { FORMAT_FILTERS } from '../domain/formatFilter';
@@ -38,7 +41,23 @@ export function SettingsScreen({
   onSignOut,
   onSettingsChanged,
 }: SettingsScreenProps) {
+  const navigation = useNavigation<NativeStackNavigationProp<{ Settings: undefined }>>();
   const { settings, loaded, update } = useSettings();
+  const [currencyDraft, setCurrencyDraft] = useState(settings.currency);
+  const [saving, setSaving] = useState(false);
+
+  React.useEffect(() => {
+    if (loaded) setCurrencyDraft(settings.currency);
+  }, [loaded, settings.currency]);
+
+  React.useEffect(() => {
+    const unsub = navigation.addListener('beforeRemove', () => {
+      if (currencyDraft !== settings.currency) {
+        void update({ currency: currencyDraft });
+      }
+    });
+    return unsub;
+  }, [navigation, currencyDraft, settings.currency, update]);
 
   const toggleFormat = useCallback(
     async (fmt: string) => {
@@ -65,6 +84,24 @@ export function SettingsScreen({
     onSignOut();
   }, [onSignOut]);
 
+  const currencyDirty = currencyDraft !== settings.currency;
+
+  const saveCurrency = useCallback(async () => {
+    if (!currencyDirty) return;
+    setSaving(true);
+    try {
+      await update({ currency: currencyDraft });
+      onSettingsChanged?.();
+    } finally {
+      setSaving(false);
+    }
+  }, [currencyDraft, currencyDirty, update, onSettingsChanged]);
+
+  const handleDone = useCallback(async () => {
+    await saveCurrency();
+    navigation.goBack();
+  }, [saveCurrency, navigation]);
+
   if (!loaded) {
     return (
       <View style={styles.center}>
@@ -74,7 +111,24 @@ export function SettingsScreen({
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <View style={styles.container}>
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          style={styles.doneBtn}
+          onPress={() => void handleDone()}
+          disabled={saving}
+        >
+          {saving ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.doneBtnText}>Done</Text>
+          )}
+        </TouchableOpacity>
+        <Text style={styles.topBarTitle}>Settings</Text>
+        <View style={styles.topBarSpacer} />
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content}>
       <Text style={styles.sectionTitle}>Formats</Text>
       {FORMAT_FILTERS.map(([id, label]) => (
         <View key={id} style={styles.row}>
@@ -176,12 +230,24 @@ export function SettingsScreen({
 
       <Text style={styles.sectionTitle}>Currency</Text>
       <CurrencyPicker
-        value={settings.currency}
-        onChange={async (currency: DiscogsCurrency) => {
-          await update({ currency });
-          onSettingsChanged?.();
-        }}
+        value={currencyDraft}
+        onChange={(currency: DiscogsCurrency) => setCurrencyDraft(currency)}
       />
+      {currencyDirty ? (
+        <TouchableOpacity
+          style={styles.saveCurrencyBtn}
+          onPress={() => void saveCurrency()}
+          disabled={saving}
+        >
+          <Text style={styles.saveCurrencyBtnText}>
+            {saving ? 'Saving…' : 'Save currency'}
+          </Text>
+        </TouchableOpacity>
+      ) : (
+        <Text style={styles.currencyHint}>
+          Tap Done when finished. Other settings save automatically.
+        </Text>
+      )}
 
       <Text style={styles.sectionTitle}>User-Agent (advanced)</Text>
       <TextInput
@@ -195,12 +261,37 @@ export function SettingsScreen({
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
     </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1a1a2e' },
-  content: { padding: 16, paddingTop: 48, paddingBottom: 32 },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 48,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  topBarTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#eee',
+  },
+  topBarSpacer: { width: 72 },
+  doneBtn: {
+    minWidth: 72,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#e94560',
+    alignItems: 'center',
+  },
+  doneBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  content: { padding: 16, paddingBottom: 32 },
   center: {
     flex: 1,
     backgroundColor: '#1a1a2e',
@@ -240,6 +331,21 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   inputMulti: { minHeight: 60 },
+  saveCurrencyBtn: {
+    backgroundColor: '#252542',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#e94560',
+  },
+  saveCurrencyBtnText: { color: '#e94560', fontWeight: '700', fontSize: 14 },
+  currencyHint: {
+    color: '#666',
+    fontSize: 12,
+    marginBottom: 8,
+  },
   signOutBtn: {
     marginTop: 32,
     backgroundColor: '#e94560',

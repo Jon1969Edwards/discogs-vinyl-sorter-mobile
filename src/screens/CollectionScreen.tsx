@@ -116,7 +116,7 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
   const [reorderMode, setReorderMode] = useState(false);
   const [reorderRows, setReorderRows] = useState<ReleaseRow[]>([]);
 
-  const settingsKey = `${settings.formats.join(',')}|${settings.sort_by}|${settings.show_prices}`;
+  const settingsKey = `${settings.formats.join(',')}|${settings.sort_by}|${settings.show_prices}|${settings.currency}`;
   const showDividers = settings.divider_mode !== 'none';
 
   useEffect(() => {
