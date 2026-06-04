@@ -25,6 +25,10 @@ Add `DISCOGS_CONSUMER_KEY` and `DISCOGS_CONSUMER_SECRET` in the Expo dashboard f
 
 After adding or changing variables, you must run a **new** build (reinstall the new APK).
 
+## Launcher icon and splash
+
+Icon paths are in [app.json](../app.json) (`assets/icon.png`, `adaptive-icon.png`, `splash-icon.png`). Metro/dev client may not update the home-screen icon. To see new artwork on a installed APK, run a **new** `preview` or `production` build and reinstall.
+
 ## Commands
 
 **Internal test APK (recommended first):**

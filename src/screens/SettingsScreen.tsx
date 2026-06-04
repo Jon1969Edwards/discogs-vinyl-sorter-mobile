@@ -1,7 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   ScrollView,
   Switch,
@@ -17,6 +16,9 @@ import { FORMAT_FILTERS } from '../domain/formatFilter';
 import { CurrencyPicker } from '../components/CurrencyPicker';
 import { clearAllAuth } from '../services';
 import type { DiscogsCurrency } from '../types';
+import { AppText } from '../components/ui/AppText';
+import { SettingsSection } from '../components/ui/SettingsSection';
+import { colors, radius, spacing } from '../theme';
 
 const DIVIDER_OPTIONS: { id: DividerMode; label: string }[] = [
   { id: 'none', label: 'None' },
@@ -105,7 +107,7 @@ export function SettingsScreen({
   if (!loaded) {
     return (
       <View style={styles.center}>
-        <Text style={styles.muted}>Loading settings…</Text>
+        <AppText variant="caption">Loading settings…</AppText>
       </View>
     );
   }
@@ -119,239 +121,267 @@ export function SettingsScreen({
           disabled={saving}
         >
           {saving ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={colors.white} />
           ) : (
-            <Text style={styles.doneBtnText}>Done</Text>
+            <AppText style={styles.doneBtnText}>Done</AppText>
           )}
         </TouchableOpacity>
-        <Text style={styles.topBarTitle}>Settings</Text>
+        <AppText variant="title" style={styles.topBarTitle}>
+          Settings
+        </AppText>
         <View style={styles.topBarSpacer} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-      <Text style={styles.sectionTitle}>Formats</Text>
-      {FORMAT_FILTERS.map(([id, label]) => (
-        <View key={id} style={styles.row}>
-          <Text style={styles.label}>{label}</Text>
-          <Switch
-            value={
-              id === 'everything'
-                ? settings.formats.includes('everything')
-                : settings.formats.includes(id)
-            }
-            onValueChange={() => toggleFormat(id)}
-            trackColor={{ false: '#252542', true: '#e94560' }}
-            thumbColor="#eee"
-            ios_backgroundColor="#252542"
+        <SettingsSection title="Collection">
+          {FORMAT_FILTERS.map(([id, label]) => (
+            <View key={id} style={styles.row}>
+              <AppText variant="body" style={styles.label}>
+                {label}
+              </AppText>
+              <Switch
+                value={
+                  id === 'everything'
+                    ? settings.formats.includes('everything')
+                    : settings.formats.includes(id)
+                }
+                onValueChange={() => toggleFormat(id)}
+                trackColor={{ false: colors.surfaceElevated, true: colors.accent }}
+                thumbColor={colors.textPrimary}
+                ios_backgroundColor={colors.surfaceElevated}
+              />
+            </View>
+          ))}
+          <View style={styles.row}>
+            <AppText variant="body" style={styles.label}>
+              Sort by
+            </AppText>
+          </View>
+          <View style={styles.chipRow}>
+            {SORT_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.id}
+                style={[
+                  styles.chip,
+                  settings.sort_by === opt.id && styles.chipActive,
+                ]}
+                onPress={async () => {
+                  await update({ sort_by: opt.id });
+                  onSettingsChanged?.();
+                }}
+              >
+                <AppText
+                  variant="bodySmall"
+                  style={[
+                    styles.chipText,
+                    settings.sort_by === opt.id && styles.chipTextActive,
+                  ]}
+                >
+                  {opt.label}
+                </AppText>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </SettingsSection>
+
+        <SettingsSection title="Export & display">
+          <AppText variant="body" style={styles.subsectionLabel}>
+            Export dividers
+          </AppText>
+          <View style={styles.chipRow}>
+            {DIVIDER_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.id}
+                style={[
+                  styles.chip,
+                  settings.divider_mode === opt.id && styles.chipActive,
+                ]}
+                onPress={async () => {
+                  await update({ divider_mode: opt.id });
+                  onSettingsChanged?.();
+                }}
+              >
+                <AppText
+                  variant="bodySmall"
+                  style={[
+                    styles.chipText,
+                    settings.divider_mode === opt.id && styles.chipTextActive,
+                  ]}
+                >
+                  {opt.label}
+                </AppText>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.row}>
+            <AppText variant="body" style={styles.label}>
+              Show prices in list
+            </AppText>
+            <Switch
+              value={settings.show_prices}
+              onValueChange={(v) => update({ show_prices: v })}
+              trackColor={{ false: colors.surfaceElevated, true: colors.accent }}
+              thumbColor={colors.textPrimary}
+            />
+          </View>
+
+          <View style={styles.row}>
+            <AppText variant="body" style={styles.label}>
+              Include JSON in exports
+            </AppText>
+            <Switch
+              value={settings.write_json}
+              onValueChange={(v) => update({ write_json: v })}
+              trackColor={{ false: colors.surfaceElevated, true: colors.accent }}
+              thumbColor={colors.textPrimary}
+            />
+          </View>
+
+          <AppText variant="body" style={[styles.label, styles.fieldLabel]}>
+            Currency
+          </AppText>
+          <CurrencyPicker
+            value={currencyDraft}
+            onChange={(currency: DiscogsCurrency) => setCurrencyDraft(currency)}
           />
-        </View>
-      ))}
-
-      <Text style={styles.sectionTitle}>Export dividers</Text>
-      <View style={styles.chipRow}>
-        {DIVIDER_OPTIONS.map((opt) => (
-          <TouchableOpacity
-            key={opt.id}
-            style={[
-              styles.chip,
-              settings.divider_mode === opt.id && styles.chipActive,
-            ]}
-            onPress={async () => {
-              await update({ divider_mode: opt.id });
-              onSettingsChanged?.();
-            }}
-          >
-            <Text
-              style={[
-                styles.chipText,
-                settings.divider_mode === opt.id && styles.chipTextActive,
-              ]}
+          {currencyDirty ? (
+            <TouchableOpacity
+              style={styles.saveCurrencyBtn}
+              onPress={() => void saveCurrency()}
+              disabled={saving}
             >
-              {opt.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+              <AppText variant="accent" style={styles.saveCurrencyBtnText}>
+                {saving ? 'Saving…' : 'Save currency'}
+              </AppText>
+            </TouchableOpacity>
+          ) : (
+            <AppText variant="caption" style={styles.currencyHint}>
+              Tap Done when finished. Other settings save automatically.
+            </AppText>
+          )}
+        </SettingsSection>
 
-      <Text style={styles.sectionTitle}>Sort by</Text>
-      <View style={styles.chipRow}>
-        {SORT_OPTIONS.map((opt) => (
-          <TouchableOpacity
-            key={opt.id}
-            style={[
-              styles.chip,
-              settings.sort_by === opt.id && styles.chipActive,
-            ]}
-            onPress={async () => {
-              await update({ sort_by: opt.id });
-              onSettingsChanged?.();
+        <SettingsSection title="Advanced">
+          <AppText variant="body" style={styles.fieldLabel}>
+            Poll interval (seconds)
+          </AppText>
+          <TextInput
+            style={styles.input}
+            keyboardType="number-pad"
+            placeholderTextColor={colors.textMuted}
+            value={String(settings.poll_seconds)}
+            onChangeText={(t) => {
+              const n = parseInt(t, 10);
+              if (!Number.isNaN(n) && n >= 60) update({ poll_seconds: n });
             }}
-          >
-            <Text
-              style={[
-                styles.chipText,
-                settings.sort_by === opt.id && styles.chipTextActive,
-              ]}
-            >
-              {opt.label}
-            </Text>
+          />
+
+          <AppText variant="body" style={styles.fieldLabel}>
+            User-Agent
+          </AppText>
+          <TextInput
+            style={[styles.input, styles.inputMulti]}
+            multiline
+            placeholderTextColor={colors.textMuted}
+            value={settings.user_agent}
+            onChangeText={(t) => update({ user_agent: t })}
+          />
+        </SettingsSection>
+
+        <SettingsSection title="Account">
+          <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
+            <AppText style={styles.signOutText}>Sign Out</AppText>
           </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={styles.row}>
-        <Text style={styles.label}>Show prices in list</Text>
-        <Switch
-          value={settings.show_prices}
-          onValueChange={(v) => update({ show_prices: v })}
-          trackColor={{ false: '#444', true: '#e94560' }}
-        />
-      </View>
-
-      <View style={styles.row}>
-        <Text style={styles.label}>Include JSON in exports</Text>
-        <Switch
-          value={settings.write_json}
-          onValueChange={(v) => update({ write_json: v })}
-          trackColor={{ false: '#444', true: '#e94560' }}
-        />
-      </View>
-
-      <Text style={styles.sectionTitle}>Poll interval (seconds)</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="number-pad"
-        value={String(settings.poll_seconds)}
-        onChangeText={(t) => {
-          const n = parseInt(t, 10);
-          if (!Number.isNaN(n) && n >= 60) update({ poll_seconds: n });
-        }}
-      />
-
-      <Text style={styles.sectionTitle}>Currency</Text>
-      <CurrencyPicker
-        value={currencyDraft}
-        onChange={(currency: DiscogsCurrency) => setCurrencyDraft(currency)}
-      />
-      {currencyDirty ? (
-        <TouchableOpacity
-          style={styles.saveCurrencyBtn}
-          onPress={() => void saveCurrency()}
-          disabled={saving}
-        >
-          <Text style={styles.saveCurrencyBtnText}>
-            {saving ? 'Saving…' : 'Save currency'}
-          </Text>
-        </TouchableOpacity>
-      ) : (
-        <Text style={styles.currencyHint}>
-          Tap Done when finished. Other settings save automatically.
-        </Text>
-      )}
-
-      <Text style={styles.sectionTitle}>User-Agent (advanced)</Text>
-      <TextInput
-        style={[styles.input, styles.inputMulti]}
-        multiline
-        value={settings.user_agent}
-        onChangeText={(t) => update({ user_agent: t })}
-      />
-
-      <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
-        <Text style={styles.signOutText}>Sign Out</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        </SettingsSection>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a1a2e' },
+  container: { flex: 1, backgroundColor: colors.background },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingTop: 48,
-    paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
   },
   topBarTitle: {
     flex: 1,
     textAlign: 'center',
     fontSize: 17,
-    fontWeight: '700',
-    color: '#eee',
   },
   topBarSpacer: { width: 72 },
   doneBtn: {
     minWidth: 72,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: '#e94560',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.sm,
+    backgroundColor: colors.accent,
     alignItems: 'center',
   },
-  doneBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  content: { padding: 16, paddingBottom: 32 },
+  doneBtnText: { color: colors.white, fontWeight: '700', fontSize: 15 },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxl },
   center: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#eee',
-    marginTop: 20,
-    marginBottom: 8,
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: spacing.sm,
   },
-  label: { color: '#ccc', fontSize: 15, flex: 1 },
-  muted: { color: '#666' },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  label: { flex: 1, color: colors.textSecondary },
+  subsectionLabel: {
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
+  },
+  fieldLabel: {
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    color: colors.textSecondary,
+  },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm },
   chip: {
-    backgroundColor: '#252542',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    backgroundColor: colors.surfaceElevated,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.sm,
   },
-  chipActive: { backgroundColor: '#e94560' },
-  chipText: { color: '#aaa', fontSize: 13 },
-  chipTextActive: { color: '#fff', fontWeight: '600' },
+  chipActive: { backgroundColor: colors.accent },
+  chipText: { color: colors.textSecondary },
+  chipTextActive: { color: colors.white, fontWeight: '600' },
   input: {
-    backgroundColor: '#252542',
-    borderRadius: 8,
-    padding: 12,
-    color: '#fff',
-    marginBottom: 8,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
   },
   inputMulti: { minHeight: 60 },
   saveCurrencyBtn: {
-    backgroundColor: '#252542',
-    borderRadius: 8,
-    padding: 12,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.sm,
+    padding: spacing.md,
     alignItems: 'center',
-    marginBottom: 4,
+    marginTop: spacing.sm,
     borderWidth: 1,
-    borderColor: '#e94560',
+    borderColor: colors.accent,
   },
-  saveCurrencyBtnText: { color: '#e94560', fontWeight: '700', fontSize: 14 },
+  saveCurrencyBtnText: { fontWeight: '700' },
   currencyHint: {
-    color: '#666',
-    fontSize: 12,
-    marginBottom: 8,
+    marginTop: spacing.sm,
   },
   signOutBtn: {
-    marginTop: 32,
-    backgroundColor: '#e94560',
-    padding: 16,
-    borderRadius: 8,
+    backgroundColor: colors.accent,
+    padding: spacing.lg,
+    borderRadius: radius.sm,
     alignItems: 'center',
   },
-  signOutText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  signOutText: { color: colors.white, fontWeight: '700', fontSize: 16 },
 });

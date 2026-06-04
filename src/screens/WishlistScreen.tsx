@@ -1,7 +1,6 @@
 import React, { useCallback } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
@@ -11,6 +10,8 @@ import {
 import { Image } from 'expo-image';
 import { useWishlist } from '../hooks/useWishlist';
 import type { WishlistEntry } from '../types';
+import { AppText } from '../components/ui/AppText';
+import { colors, radius, spacing } from '../theme';
 
 function WishlistRow({
   item,
@@ -22,19 +23,25 @@ function WishlistRow({
   return (
     <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
       {item.thumb ? (
-        <Image source={{ uri: item.thumb }} style={styles.thumb} contentFit="cover" />
+        <Image
+          source={{ uri: item.thumb }}
+          style={[styles.thumb, styles.thumbImage]}
+          contentFit="cover"
+        />
       ) : (
         <View style={[styles.thumb, styles.thumbPlaceholder]} />
       )}
       <View style={styles.rowText}>
-        <Text style={styles.artist} numberOfLines={1}>
+        <AppText variant="body" style={styles.artist} numberOfLines={1}>
           {item.artist}
-        </Text>
-        <Text style={styles.title} numberOfLines={1}>
+        </AppText>
+        <AppText variant="bodySmall" numberOfLines={1}>
           {item.title}
-        </Text>
+        </AppText>
         {item.year ? (
-          <Text style={styles.meta}>{item.year}</Text>
+          <AppText variant="caption" style={styles.meta}>
+            {item.year}
+          </AppText>
         ) : null}
       </View>
     </TouchableOpacity>
@@ -51,7 +58,7 @@ export function WishlistScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#e94560" />
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }
@@ -59,9 +66,13 @@ export function WishlistScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Wishlist ({entries.length})</Text>
-        <TouchableOpacity onPress={refresh}>
-          <Text style={styles.refresh}>Refresh</Text>
+        <AppText variant="title" style={styles.headerTitle}>
+          Wishlist ({entries.length})
+        </AppText>
+        <TouchableOpacity onPress={refresh} style={styles.refreshBtn}>
+          <AppText variant="accent" style={styles.refresh}>
+            Refresh
+          </AppText>
         </TouchableOpacity>
       </View>
       <FlatList
@@ -73,9 +84,9 @@ export function WishlistScreen() {
           <WishlistRow item={item} onPress={() => openItem(item)} />
         )}
         ListEmptyComponent={
-          <Text style={styles.empty}>
+          <AppText variant="caption" style={styles.empty}>
             Wishlist is empty. Sync happens when you refresh your collection, or add items from the shelf view.
-          </Text>
+          </AppText>
         }
       />
     </View>
@@ -83,10 +94,10 @@ export function WishlistScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a1a2e' },
+  container: { flex: 1, backgroundColor: colors.background },
   center: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -94,23 +105,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: spacing.lg,
     paddingTop: 48,
   },
-  headerTitle: { fontSize: 18, fontWeight: '600', color: '#eee' },
-  refresh: { color: '#aaa', fontSize: 14 },
+  headerTitle: { fontSize: 18 },
+  refreshBtn: {
+    minHeight: 48,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+  },
+  refresh: { fontSize: 14 },
   row: {
     flexDirection: 'row',
-    padding: 12,
-    paddingHorizontal: 16,
+    padding: spacing.md,
+    paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#252542',
+    borderBottomColor: colors.surface,
   },
-  thumb: { width: 48, height: 48, borderRadius: 4 },
-  thumbPlaceholder: { backgroundColor: '#252542' },
-  rowText: { flex: 1, marginLeft: 12, justifyContent: 'center' },
-  artist: { fontSize: 16, fontWeight: '600', color: '#eee' },
-  title: { fontSize: 14, color: '#bbb' },
-  meta: { fontSize: 12, color: '#666', marginTop: 2 },
-  empty: { color: '#666', textAlign: 'center', padding: 24 },
+  thumb: { width: 48, height: 48, borderRadius: radius.sm },
+  thumbImage: { backgroundColor: colors.surface },
+  thumbPlaceholder: { backgroundColor: colors.surface },
+  rowText: { flex: 1, marginLeft: spacing.md, justifyContent: 'center' },
+  artist: { fontWeight: '600', color: colors.textPrimary },
+  meta: { marginTop: 2 },
+  empty: { textAlign: 'center', padding: spacing.xl },
 });

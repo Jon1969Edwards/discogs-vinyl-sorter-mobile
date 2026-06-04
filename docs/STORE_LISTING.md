@@ -40,15 +40,16 @@ Host `docs/PRIVACY_POLICY.md` on GitHub Pages or your site, then paste the publi
 
 ## Screenshots (capture on device)
 
-Suggested shots (1080×1920 or 1080×2340):
+Suggested shots (1080×1920 or 1080×2340) after a **preview/production** build with the refreshed UI:
 
-1. Collection list with LP count and search
-2. Settings (formats + currency)
-3. Album detail with price
-4. Export share sheet
-5. Wishlist tab (optional)
+1. Auth screen with app logo and “Sign in with Discogs”
+2. Collection list with LP count, search, and icon tabs (Collection / Wishlist)
+3. Settings grouped sections (Collection, Export & display, Advanced, Account)
+4. Album detail with price
+5. Header menu → Export TXT (then share sheet)
+6. Wishlist tab (optional)
 
-Place PNGs in `assets/store/` when ready (folder not required for dev builds).
+App icon for listings: `assets/store/icon.png` (1024×1024). Replace screenshot PNGs in `assets/store/` when captured.
 
 ## Content rating
 
