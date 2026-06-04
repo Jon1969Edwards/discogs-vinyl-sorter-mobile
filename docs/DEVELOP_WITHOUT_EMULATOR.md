@@ -118,9 +118,32 @@ If EAS asks **“Install and run on an emulator?”** → answer **No** (your PC
 npm start
 ```
 
-Open **Discogs Vinyl Sorter** on the phone. Ensure phone and PC are on the same Wi‑Fi (or use tunnel: `npx expo start --dev-client --tunnel`).
+Open **Discogs Vinyl Sorter** on the phone. Prefer **same Wi‑Fi + LAN** (see below). Tunnel is optional.
 
 Rebuild the dev client only when you change native dependencies or `app.json` plugins — not for normal TS/React edits.
+
+### Tunnel failed: `Cannot read properties of undefined (reading 'body')`
+
+Expo’s built-in tunnel uses ngrok (`*.exp.direct`). That error usually means **ngrok rejected the session** (Expo shared limit, outage, or missing package)—not a bug in this app.
+
+**Use LAN instead (recommended):**
+
+```powershell
+npm run start:lan
+# or: npx expo start --dev-client --lan --clear
+```
+
+On the phone dev client, connect to `http://YOUR_PC_IP:8081` (from `ipconfig`, e.g. `http://192.168.50.166:8081`).
+
+**If you need tunnel** (phone on cellular / different network):
+
+1. Project includes `@expo/ngrok` as a dev dependency—retry `npm run start:tunnel`.
+2. If it still fails, use your own ngrok account:
+   - `npx expo start --dev-client --lan`
+   - In another terminal: `ngrok http 8081` (with your authtoken from [ngrok dashboard](https://dashboard.ngrok.com/))
+   - Set `EXPO_PACKAGER_PROXY_URL` to the ngrok `https://…` URL, restart Metro, connect the dev app to that URL.
+
+Check [ngrok status](https://status.ngrok.com/) and [Expo issue #43335](https://github.com/expo/expo/issues/43335) for service-side limits.
 
 ### Red screen: `RNGestureHandlerModule could not be found`
 

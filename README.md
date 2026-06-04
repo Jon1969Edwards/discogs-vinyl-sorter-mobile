@@ -33,7 +33,8 @@ npm start
    - **No emulator / emulator broken?** → [docs/DEVELOP_WITHOUT_EMULATOR.md](./docs/DEVELOP_WITHOUT_EMULATOR.md) (USB phone or EAS cloud APK)
    - **Phone (recommended):** USB debugging on → `adb devices` shows `device` → `npm run android:device`
    - **Emulator (optional):** VT-x enabled in BIOS → `npm run android:emulator` → home screen → `npm run android`
-   - Day-to-day JS: `npm start`, then open **Discogs Vinyl Sorter** on the phone (not Expo Go)
+   - Day-to-day JS: `npm run start:lan`, then open **Discogs Vinyl Sorter** on the phone with `http://YOUR_PC_IP:8081` (not Expo Go; not `localhost`)
+   - Tunnel (`npm run start:tunnel`) only if LAN fails—see [docs/DEVELOP_WITHOUT_EMULATOR.md](./docs/DEVELOP_WITHOUT_EMULATOR.md) if ngrok errors
 
 If you see `RNGestureHandlerModule could not be found`, you opened the bundle in **Expo Go** or an outdated APK — run `npm run android` once, then use `npm start` and the dev client app.
 
