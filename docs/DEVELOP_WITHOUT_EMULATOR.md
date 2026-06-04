@@ -106,7 +106,9 @@ cd F:\Dev\discogs-vinyl-sorter-mobile
 eas build --profile development --platform android
 ```
 
-When the build finishes, open the link on your phone (or scan QR), download the **APK**, and install (allow “Install unknown apps” for the browser if asked).
+When the build finishes, open the build link on your phone, download the **APK**, and install (allow “Install unknown apps” for the browser if asked).
+
+If EAS asks **“Install and run on an emulator?”** → answer **No** (your PC emulator needs VT-x in BIOS). The APK is already built; install it on a **physical phone** from the link instead.
 
 **Gradle failed on EAS with invalid `org.gradle.java.home`?** Remove any Windows JDK path from `android/gradle.properties` (committed file must not pin `C:/...`). Use `JAVA_HOME` locally instead; see `android/gradle.properties.local.example`.
 
