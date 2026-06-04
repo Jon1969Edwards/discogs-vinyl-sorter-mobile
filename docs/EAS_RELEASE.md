@@ -19,6 +19,12 @@ Standalone installs that **do not** need Metro. Distinct from the **development*
 | `preview` | Internal APK for testing without Metro |
 | `production` | Play Store–style build (`autoIncrement` version) |
 
+## OAuth environment variables
+
+Add `DISCOGS_CONSUMER_KEY` and `DISCOGS_CONSUMER_SECRET` in the Expo dashboard for **preview** and **production** (Sensitive / Secret visibility). The `eas-build-pre-install` script writes them to `.env` on the build server so OAuth is compiled into the APK.
+
+After adding or changing variables, you must run a **new** build (reinstall the new APK).
+
 ## Commands
 
 **Internal test APK (recommended first):**

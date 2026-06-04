@@ -8,6 +8,7 @@
     "start:tunnel": "expo start --dev-client --tunnel",
     "start:clear": "expo start --dev-client --clear",
     "postinstall": "node scripts/fix-nested-deps.js",
+    "eas-build-pre-install": "node scripts/eas-write-env.js",
     "android": "node scripts/run-android.js",
     "android:device": "node scripts/run-android.js --device-only",
     "android:emulator": "node scripts/start-emulator.js",
