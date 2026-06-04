@@ -25,7 +25,7 @@ import {
   setStoredToken,
   getStoredCredentials,
 } from '../services';
-import { runDiscogsOAuthFlow } from '../services/oauthDiscogs';
+import { runOAuthFlow } from '../services/oauthDiscogs';
 
 const DISCOGS_TOKEN_URL = 'https://www.discogs.com/settings/developers';
 
@@ -62,14 +62,11 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     setError(null);
 
     try {
-      const tokens = await runDiscogsOAuthFlow(
-        DISCOGS_CONSUMER_KEY.trim(),
-        DISCOGS_CONSUMER_SECRET.trim()
-      );
+      const tokens = await runOAuthFlow();
       await setStoredCredentials({
         type: 'oauth',
-        token: tokens.token,
-        secret: tokens.secret,
+        token: tokens.accessToken,
+        secret: tokens.accessSecret,
       });
       onAuthenticated();
     } catch (err) {
