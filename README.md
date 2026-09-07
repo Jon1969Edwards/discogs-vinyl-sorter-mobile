@@ -75,7 +75,7 @@ src/
 | [docs/PRIVACY_POLICY.md](./docs/PRIVACY_POLICY.md) | Privacy policy draft |
 | [MOBILE_PARITY_HANDOFF.md](./MOBILE_PARITY_HANDOFF.md) | Parity status and architecture |
 
-Run `npm test` (33 tests) before merging. Enable **Show prices in list** in Settings to see marketplace prices on collection rows.
+Run `npm test` (41 tests) before merging. Enable **Show prices in list** in Settings (Pro) to see marketplace prices on collection rows.
 
 ## Related
 

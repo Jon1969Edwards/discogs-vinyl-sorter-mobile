@@ -97,6 +97,8 @@ export interface AppSettings {
   write_json: boolean;
   poll_seconds: number;
   show_prices: boolean;
+  /** Persist last export under app Documents (in addition to share sheet). */
+  save_last_export: boolean;
   per_page: number;
 }
 
@@ -109,6 +111,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   write_json: false,
   poll_seconds: 300,
   show_prices: false,
+  save_last_export: true,
   per_page: 100,
 };
 

@@ -36,6 +36,10 @@ export async function loadSettings(): Promise<AppSettings> {
       ...parsed,
       formats: Array.isArray(parsed.formats) ? parsed.formats : DEFAULT_SETTINGS.formats,
       currency: normalizeDiscogsCurrency(parsed.currency),
+      save_last_export:
+        typeof parsed.save_last_export === 'boolean'
+          ? parsed.save_last_export
+          : DEFAULT_SETTINGS.save_last_export,
     };
   } catch {
     return { ...DEFAULT_SETTINGS };

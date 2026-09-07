@@ -15,6 +15,7 @@ import { AlbumDetailScreen } from './src/screens/AlbumDetailScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { MainTabs } from './src/navigation/MainTabs';
 import { SettingsProvider } from './src/context/SettingsContext';
+import { LicenseProvider } from './src/context/LicenseContext';
 import { hasStoredCredentials } from './src/services';
 
 const Stack = createNativeStackNavigator();
@@ -41,6 +42,7 @@ export default function App() {
     <GestureHandlerRootView style={styles.root}>
     <SafeAreaProvider>
       <SettingsProvider>
+        <LicenseProvider>
         <NavigationContainer>
           <StatusBar style="light" />
           <Stack.Navigator
@@ -84,6 +86,7 @@ export default function App() {
             )}
           </Stack.Navigator>
         </NavigationContainer>
+        </LicenseProvider>
       </SettingsProvider>
     </SafeAreaProvider>
     </GestureHandlerRootView>

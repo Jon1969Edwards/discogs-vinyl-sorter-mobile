@@ -1,5 +1,6 @@
 /**
  * Write export to file and share via system share sheet.
+ * Optionally keeps a durable copy under Documents/exports/.
  */
 
 import * as FileSystem from 'expo-file-system';
@@ -8,13 +9,24 @@ import type { ReleaseRow } from '../types';
 import type { DividerMode } from '../types';
 import { generateTxt, generateCsv, generateJson } from '../domain/export';
 import { loadSettings } from './settings';
+import { refreshProStatus } from './licensing';
+import {
+  applyRecordLimit,
+  canUseAbcDividers,
+} from './featureGate';
 
 export type ExportFormat = 'txt' | 'csv' | 'json';
 
 const FILENAMES: Record<ExportFormat, string> = {
-  txt: 'vinyl_shelf_order.txt',
-  csv: 'vinyl_shelf_order.csv',
-  json: 'vinyl_shelf_order.json',
+  txt: 'spindle_shelf_order.txt',
+  csv: 'spindle_shelf_order.csv',
+  json: 'spindle_shelf_order.json',
+};
+
+export type ExportResult = {
+  truncated: boolean;
+  savedPath: string | null;
+  shared: boolean;
 };
 
 export async function exportAndShare(
@@ -24,33 +36,53 @@ export async function exportAndShare(
     dividerMode?: DividerMode;
     showPrice?: boolean;
   }
-): Promise<void> {
+): Promise<ExportResult> {
   const settings = await loadSettings();
-  const dividerMode = options?.dividerMode ?? settings.divider_mode;
-  const showPrice = options?.showPrice ?? settings.show_prices;
+  const pro = await refreshProStatus();
+  const { rows: limited, truncated } = applyRecordLimit(rows, pro);
+
+  let dividerMode = options?.dividerMode ?? settings.divider_mode;
+  if (dividerMode === 'abc' && !canUseAbcDividers(pro)) {
+    dividerMode = 'letter';
+  }
+  const showPrice =
+    (options?.showPrice ?? settings.show_prices) && pro;
 
   const filename = FILENAMES[format];
   let content: string;
 
   switch (format) {
     case 'txt':
-      content = generateTxt(rows, {
+      content = generateTxt(limited, {
         dividerMode,
         showPrice,
       });
       break;
     case 'csv':
-      content = generateCsv(rows);
+      content = generateCsv(limited);
       break;
     case 'json':
-      content = generateJson(rows);
+      content = generateJson(limited);
       break;
     default:
       throw new Error(`Unknown format: ${format}`);
   }
 
-  const path = `${FileSystem.cacheDirectory}${filename}`;
-  await FileSystem.writeAsStringAsync(path, content, {
+  let savedPath: string | null = null;
+  if (settings.save_last_export !== false && FileSystem.documentDirectory) {
+    const dir = `${FileSystem.documentDirectory}exports/`;
+    const info = await FileSystem.getInfoAsync(dir);
+    if (!info.exists) {
+      await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+    }
+    savedPath = `${dir}${filename}`;
+    await FileSystem.writeAsStringAsync(savedPath, content, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+  }
+
+  const cachePath = `${FileSystem.cacheDirectory}${filename}`;
+  await FileSystem.writeAsStringAsync(cachePath, content, {
     encoding: FileSystem.EncodingType.UTF8,
   });
 
@@ -59,7 +91,7 @@ export async function exportAndShare(
     throw new Error('Sharing is not available on this device');
   }
 
-  await Sharing.shareAsync(path, {
+  await Sharing.shareAsync(cachePath, {
     mimeType:
       format === 'json'
         ? 'application/json'
@@ -68,4 +100,6 @@ export async function exportAndShare(
           : 'text/plain',
     dialogTitle: `Share ${filename}`,
   });
+
+  return { truncated, savedPath, shared: true };
 }

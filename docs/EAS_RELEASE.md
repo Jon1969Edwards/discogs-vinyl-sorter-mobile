@@ -6,9 +6,10 @@ Standalone installs that **do not** need Metro. Distinct from the **development*
 
 1. Complete [SMOKE_TEST_CHECKLIST.md](./SMOKE_TEST_CHECKLIST.md) on a dev-client build.
 2. [Expo EAS CLI](https://docs.expo.dev/build/setup/): `npm install -g eas-cli` and `eas login`.
-3. OAuth secrets on EAS (Project → Secrets), **not** committed to git:
+3. OAuth / license secrets on EAS (Project → Secrets), **not** committed to git:
    - `DISCOGS_CONSUMER_KEY`
    - `DISCOGS_CONSUMER_SECRET`
+   - `VSS_LICENSE_SECRET` (same HMAC secret as Windows Pro keys; required for Pro activation in release builds)
 4. Discogs app callback URL: `discogvinylsorter://callback` (see [OAUTH_SETUP.md](./OAUTH_SETUP.md)).
 
 ## Profiles ([eas.json](../eas.json))
@@ -21,7 +22,7 @@ Standalone installs that **do not** need Metro. Distinct from the **development*
 
 ## OAuth environment variables
 
-Add `DISCOGS_CONSUMER_KEY` and `DISCOGS_CONSUMER_SECRET` in the Expo dashboard for **preview** and **production** (Sensitive / Secret visibility). The `eas-build-pre-install` script writes them to `.env` on the build server so OAuth is compiled into the APK.
+Add `DISCOGS_CONSUMER_KEY`, `DISCOGS_CONSUMER_SECRET`, and optionally `VSS_LICENSE_SECRET` in the Expo dashboard for **preview** and **production** (Sensitive / Secret visibility). The `eas-build-pre-install` script writes them to `.env` on the build server so OAuth (and Pro keys) compile into the APK. Without `VSS_LICENSE_SECRET`, Pro activation fails closed in release.
 
 After adding or changing variables, you must run a **new** build (reinstall the new APK).
 

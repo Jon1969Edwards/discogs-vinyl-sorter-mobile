@@ -24,6 +24,7 @@ import { colors, radius, spacing } from '../theme';
 import { useCollection } from '../hooks/useCollection';
 import { useCollectionWatch } from '../hooks/useCollectionWatch';
 import { useSettings } from '../context/SettingsContext';
+import { useLicense } from '../context/LicenseContext';
 import { sortRows, getSectionLetter } from '../utils';
 import { formatListPrice } from '../utils/formatPrice';
 import { releaseRowKey } from '../utils/releaseRowKey';
@@ -39,6 +40,9 @@ import {
   clearManualOrder,
   manualOrderIsEnabled,
 } from '../services/manualOrder';
+import { canFetchPrices, canUseManualOrder, FREE_RECORD_LIMIT } from '../services/featureGate';
+import { LicenseModal } from '../components/LicenseModal';
+import { ProUpgradeModal } from '../components/ProUpgradeModal';
 
 export type RootStackParamList = {
   MainTabs: undefined;
@@ -125,19 +129,24 @@ function AlbumRow({
 
 export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProps) {
   const { settings, loaded } = useSettings();
+  const { isPro } = useLicense();
   const { state, fetchCollection, refreshCollection, repriceCollection, reset } =
     useCollection();
   const [credentials, setCredentials] = useState<import('../services').DiscogsCredentials | null>(null);
   const [search, setSearch] = useState('');
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [exportNote, setExportNote] = useState<string | null>(null);
   const [manualOrderActive, setManualOrderActive] = useState(false);
   const [manualOverrideRows, setManualOverrideRows] = useState<ReleaseRow[] | null>(null);
   const [reorderMode, setReorderMode] = useState(false);
   const [reorderRows, setReorderRows] = useState<ReleaseRow[]>([]);
+  const [licenseOpen, setLicenseOpen] = useState(false);
+  const [upsellFeature, setUpsellFeature] = useState<string | null>(null);
 
-  const settingsKey = `${settings.formats.join(',')}|${settings.sort_by}|${settings.show_prices}|${settings.currency}`;
+  const settingsKey = `${settings.formats.join(',')}|${settings.sort_by}|${settings.show_prices}|${settings.currency}|${isPro}`;
   const showDividers = settings.divider_mode !== 'none';
+  const showListPrices = settings.show_prices && canFetchPrices(isPro);
 
   useEffect(() => {
     getStoredCredentials().then(setCredentials);
@@ -228,8 +237,16 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
       if (state.status !== 'success' || catalogRows.length === 0) return;
       setExporting(true);
       setExportError(null);
+      setExportNote(null);
       try {
-        await exportAndShare(catalogRows, format);
+        const result = await exportAndShare(catalogRows, format);
+        if (result.truncated) {
+          setExportNote(
+            `Free export limited to ${FREE_RECORD_LIMIT} records. Upgrade to Pro for the full list.`
+          );
+        } else if (result.savedPath) {
+          setExportNote('Export shared and saved on this device.');
+        }
       } catch (err) {
         setExportError(err instanceof Error ? err.message : 'Export failed');
       } finally {
@@ -273,9 +290,13 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
 
   const enterReorderMode = useCallback(() => {
     if (search.trim()) return;
+    if (!canUseManualOrder(isPro)) {
+      setUpsellFeature('Manual shelf order');
+      return;
+    }
     setReorderRows(catalogRows);
     setReorderMode(true);
-  }, [catalogRows, search]);
+  }, [catalogRows, search, isPro]);
 
   const finishReorder = useCallback(async () => {
     const ids = reorderRows
@@ -401,8 +422,28 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
       {state.stale ? (
         <TouchableOpacity style={styles.staleBanner} onPress={handleRefresh}>
           <Text style={styles.staleBannerText}>
-            Cached collection · <Text style={styles.staleBannerAction}>Sync now</Text>
+            Offline / cached
+            {state.lastSyncedAt
+              ? ` · last sync ${new Date(state.lastSyncedAt).toLocaleString()}`
+              : ''}
+            {' · '}
+            <Text style={styles.staleBannerAction}>Sync now</Text>
           </Text>
+        </TouchableOpacity>
+      ) : null}
+      {state.status === 'success' && state.truncated ? (
+        <TouchableOpacity
+          style={styles.limitBanner}
+          onPress={() => setUpsellFeature('Unlimited collection')}
+        >
+          <Text style={styles.limitBannerText}>
+            Free shows {FREE_RECORD_LIMIT} records — tap to unlock Pro
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+      {exportNote ? (
+        <TouchableOpacity style={styles.noteBanner} onPress={() => setExportNote(null)}>
+          <Text style={styles.noteBannerText}>{exportNote}</Text>
         </TouchableOpacity>
       ) : null}
 
@@ -452,7 +493,7 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
           renderItem={({ item }) => (
             <AlbumRow
               item={item}
-              showPrices={settings.show_prices}
+              showPrices={showListPrices}
               currency={settings.currency}
               onPress={() => navigation.navigate('AlbumDetail', { release: item })}
             />
@@ -477,7 +518,7 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
           renderItem={({ item }) => (
             <AlbumRow
               item={item}
-              showPrices={settings.show_prices}
+              showPrices={showListPrices}
               currency={settings.currency}
               onPress={() => navigation.navigate('AlbumDetail', { release: item })}
             />
@@ -490,6 +531,17 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
           }
         />
       )}
+
+      <ProUpgradeModal
+        visible={upsellFeature != null}
+        feature={upsellFeature || 'This feature'}
+        onClose={() => setUpsellFeature(null)}
+        onOpenLicense={() => {
+          setUpsellFeature(null);
+          setLicenseOpen(true);
+        }}
+      />
+      <LicenseModal visible={licenseOpen} onClose={() => setLicenseOpen(false)} />
     </View>
   );
 }
@@ -527,6 +579,27 @@ const styles = StyleSheet.create({
   staleBannerAction: {
     fontWeight: '700',
     textDecorationLine: 'underline',
+  },
+  limitBanner: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 10,
+    marginBottom: spacing.xs,
+    backgroundColor: colors.accentMuted,
+  },
+  limitBannerText: {
+    color: colors.accent,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  noteBanner: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 10,
+    marginBottom: spacing.xs,
+    backgroundColor: colors.surface,
+  },
+  noteBannerText: {
+    color: colors.textSecondary,
+    fontSize: 13,
   },
   pricesBanner: {
     paddingHorizontal: spacing.lg,

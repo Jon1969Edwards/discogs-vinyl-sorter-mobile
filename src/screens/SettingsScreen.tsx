@@ -18,6 +18,13 @@ import { clearAllAuth } from '../services';
 import type { DiscogsCurrency } from '../types';
 import { AppText } from '../components/ui/AppText';
 import { SettingsSection } from '../components/ui/SettingsSection';
+import { LicenseModal } from '../components/LicenseModal';
+import { ProUpgradeModal } from '../components/ProUpgradeModal';
+import { useLicense } from '../context/LicenseContext';
+import {
+  canFetchPrices,
+  canUseAbcDividers,
+} from '../services/featureGate';
 import { colors, radius, spacing } from '../theme';
 import {
   APP_NAME,
@@ -51,8 +58,11 @@ export function SettingsScreen({
 }: SettingsScreenProps) {
   const navigation = useNavigation<NativeStackNavigationProp<{ Settings: undefined }>>();
   const { settings, loaded, update } = useSettings();
+  const { isPro, summary } = useLicense();
   const [currencyDraft, setCurrencyDraft] = useState(settings.currency);
   const [saving, setSaving] = useState(false);
+  const [licenseOpen, setLicenseOpen] = useState(false);
+  const [upsellFeature, setUpsellFeature] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (loaded) setCurrencyDraft(settings.currency);
@@ -172,6 +182,13 @@ export function SettingsScreen({
                   settings.sort_by === opt.id && styles.chipActive,
                 ]}
                 onPress={async () => {
+                  if (
+                    (opt.id === 'price_asc' || opt.id === 'price_desc') &&
+                    !canFetchPrices(isPro)
+                  ) {
+                    setUpsellFeature('Marketplace prices');
+                    return;
+                  }
                   await update({ sort_by: opt.id });
                   onSettingsChanged?.();
                 }}
@@ -184,10 +201,40 @@ export function SettingsScreen({
                   ]}
                 >
                   {opt.label}
+                  {(opt.id === 'price_asc' || opt.id === 'price_desc') && !isPro
+                    ? ' (Pro)'
+                    : ''}
                 </AppText>
               </TouchableOpacity>
             ))}
           </View>
+        </SettingsSection>
+
+        <SettingsSection title="Pro">
+          <AppText variant="body" style={styles.aboutTitle}>
+            Status: {summary}
+          </AppText>
+          {!isPro ? (
+            <>
+              <AppText variant="caption" style={styles.aboutCaption}>
+                Free includes up to 100 records. Pro unlocks prices, manual
+                order, A/B/C dividers, and more.
+              </AppText>
+              <TouchableOpacity
+                style={styles.proBtn}
+                onPress={() => setLicenseOpen(true)}
+              >
+                <AppText style={styles.proBtnText}>Upgrade to Pro</AppText>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity
+              style={styles.proBtnSecondary}
+              onPress={() => setLicenseOpen(true)}
+            >
+              <AppText style={styles.proBtnTextSecondary}>Manage license</AppText>
+            </TouchableOpacity>
+          )}
         </SettingsSection>
 
         <SettingsSection title="Export & display">
@@ -203,6 +250,10 @@ export function SettingsScreen({
                   settings.divider_mode === opt.id && styles.chipActive,
                 ]}
                 onPress={async () => {
+                  if (opt.id === 'abc' && !canUseAbcDividers(isPro)) {
+                    setUpsellFeature('A/B/C shelf dividers');
+                    return;
+                  }
                   await update({ divider_mode: opt.id });
                   onSettingsChanged?.();
                 }}
@@ -215,6 +266,7 @@ export function SettingsScreen({
                   ]}
                 >
                   {opt.label}
+                  {opt.id === 'abc' && !isPro ? ' (Pro)' : ''}
                 </AppText>
               </TouchableOpacity>
             ))}
@@ -225,8 +277,26 @@ export function SettingsScreen({
               Show prices in list
             </AppText>
             <Switch
-              value={settings.show_prices}
-              onValueChange={(v) => update({ show_prices: v })}
+              value={settings.show_prices && canFetchPrices(isPro)}
+              onValueChange={(v) => {
+                if (v && !canFetchPrices(isPro)) {
+                  setUpsellFeature('Marketplace prices');
+                  return;
+                }
+                void update({ show_prices: v });
+              }}
+              trackColor={{ false: colors.surfaceElevated, true: colors.accent }}
+              thumbColor={colors.textPrimary}
+            />
+          </View>
+
+          <View style={styles.row}>
+            <AppText variant="body" style={styles.label}>
+              Save last export on device
+            </AppText>
+            <Switch
+              value={settings.save_last_export !== false}
+              onValueChange={(v) => void update({ save_last_export: v })}
               trackColor={{ false: colors.surfaceElevated, true: colors.accent }}
               thumbColor={colors.textPrimary}
             />
@@ -313,6 +383,17 @@ export function SettingsScreen({
           </TouchableOpacity>
         </SettingsSection>
       </ScrollView>
+
+      <LicenseModal visible={licenseOpen} onClose={() => setLicenseOpen(false)} />
+      <ProUpgradeModal
+        visible={upsellFeature != null}
+        feature={upsellFeature || 'This feature'}
+        onClose={() => setUpsellFeature(null)}
+        onOpenLicense={() => {
+          setUpsellFeature(null);
+          setLicenseOpen(true);
+        }}
+      />
     </View>
   );
 }
@@ -400,6 +481,26 @@ const styles = StyleSheet.create({
   },
   aboutCaption: {
     marginBottom: spacing.xs,
+  },
+  proBtn: {
+    backgroundColor: colors.accent,
+    padding: spacing.md,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  proBtnText: { color: colors.white, fontWeight: '700', fontSize: 15 },
+  proBtnSecondary: {
+    backgroundColor: colors.surfaceElevated,
+    padding: spacing.md,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  proBtnTextSecondary: {
+    color: colors.textPrimary,
+    fontWeight: '600',
+    fontSize: 15,
   },
   signOutBtn: {
     backgroundColor: colors.accent,

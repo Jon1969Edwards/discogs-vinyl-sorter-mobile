@@ -32,8 +32,14 @@ import {
   setCacheUsername,
   saveCachedRows,
   loadCachedRows,
+  getLastFullFetch,
 } from '../services/collectionCache';
 import { syncWishlistFromDiscogs } from '../services/wishlist';
+import { refreshProStatus } from '../services/licensing';
+import {
+  applyRecordLimit,
+  canFetchPrices,
+} from '../services/featureGate';
 
 export type CollectionState =
   | { status: 'idle' }
@@ -44,6 +50,9 @@ export type CollectionState =
       rows: ReleaseRow[];
       username: string;
       stale?: boolean;
+      /** Epoch ms of last successful full sync (from cache metadata when stale). */
+      lastSyncedAt?: number | null;
+      truncated?: boolean;
       itemCount?: number;
       /** Marketplace prices still loading in the background */
       pricesLoading?: boolean;
@@ -66,6 +75,7 @@ export function useCollection() {
         }
 
         const settings = await loadSettings();
+        const pro = await refreshProStatus();
         const client = createDiscogsClient(credentials);
         const identity = await getIdentity(client);
 
@@ -105,16 +115,20 @@ export function useCollection() {
         const formatSet = formatsToSet(settings.formats);
         let processed = filterRowsByFormat(allRows, formatSet);
 
-        const needPrices =
-          settings.show_prices ||
-          settings.sort_by === 'price_asc' ||
-          settings.sort_by === 'price_desc';
+        const { rows: limited, truncated } = applyRecordLimit(processed, pro);
+        processed = limited;
+
+        const wantPrices =
+          (settings.show_prices ||
+            settings.sort_by === 'price_asc' ||
+            settings.sort_by === 'price_desc') &&
+          canFetchPrices(pro);
         const sortByPrice =
           settings.sort_by === 'price_asc' ||
           settings.sort_by === 'price_desc';
-        const deferPrices = needPrices && !sortByPrice;
+        const deferPrices = wantPrices && !sortByPrice;
 
-        if (needPrices && sortByPrice) {
+        if (wantPrices && sortByPrice) {
           setState({
             status: 'loading',
             message: 'Fetching marketplace prices…',
@@ -144,6 +158,7 @@ export function useCollection() {
 
         const itemCount = await getCollectionCount(client, identity.username);
         await markFullFetch(identity.username, itemCount);
+        const lastSyncedAt = Date.now();
 
         try {
           await syncWishlistFromDiscogs(client, identity.username);
@@ -160,6 +175,8 @@ export function useCollection() {
             username: identity.username,
             itemCount,
             stale: false,
+            lastSyncedAt,
+            truncated,
             pricesLoading: true,
             priceProgress: 0,
           });
@@ -211,15 +228,26 @@ export function useCollection() {
           username: identity.username,
           itemCount,
           stale: false,
+          lastSyncedAt,
+          truncated,
         });
       } catch (err) {
         const cached = await loadCachedRows();
         if (cached) {
+          const lastSyncedAt =
+            cached.saved_at ?? (await getLastFullFetch());
+          const pro = await refreshProStatus();
+          const { rows: limited, truncated } = applyRecordLimit(
+            cached.rows,
+            pro
+          );
           setState({
             status: 'success',
-            rows: cached.rows,
+            rows: limited,
             username: cached.username,
             stale: true,
+            lastSyncedAt,
+            truncated,
           });
           return;
         }
@@ -239,15 +267,17 @@ export function useCollection() {
   const repriceCollection = useCallback(
     async (credentials: DiscogsCredentials) => {
       const settings = await loadSettings();
+      const pro = await refreshProStatus();
       const needPrices =
-        settings.show_prices ||
-        settings.sort_by === 'price_asc' ||
-        settings.sort_by === 'price_desc';
+        (settings.show_prices ||
+          settings.sort_by === 'price_asc' ||
+          settings.sort_by === 'price_desc') &&
+        canFetchPrices(pro);
 
       setState((prev) => {
         if (prev.status !== 'success' || !needPrices) return prev;
 
-        const { rows, username, itemCount } = prev;
+        const { rows, username, itemCount, truncated, lastSyncedAt } = prev;
 
         void (async () => {
           try {
@@ -283,6 +313,8 @@ export function useCollection() {
               username,
               itemCount,
               stale: false,
+              lastSyncedAt,
+              truncated,
               pricesLoading: false,
               priceProgress: undefined,
             });

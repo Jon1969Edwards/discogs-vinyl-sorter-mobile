@@ -1,5 +1,5 @@
 /**
- * Album detail screen – full release info, link to Discogs.
+ * Album detail screen – full release info, Discogs / Spotify / wishlist.
  */
 
 import React, { useCallback, useState } from 'react';
@@ -15,14 +15,26 @@ import { Image } from 'expo-image';
 import { useFocusEffect } from '@react-navigation/native';
 import type { ReleaseRow } from '../types';
 import { useSettings } from '../context/SettingsContext';
+import { useLicense } from '../context/LicenseContext';
 import {
   createDiscogsClient,
   fetchMarketplaceStats,
   getStoredCredentials,
+  addToWishlist,
+  removeFromWishlist,
+  loadLocalWishlist,
+  isInWishlist,
 } from '../services';
+import { getCachedPrice } from '../services/collectionCache';
+import { canFetchPrices } from '../services/featureGate';
 import { formatCollectionNotes } from '../utils/collectionNotes';
 import { formatMarketplacePrice } from '../utils/formatPrice';
 import { openDiscogsUrl } from '../utils/discogsLinking';
+import { openAlbumOnSpotify } from '../utils/spotify';
+import { rowToWishlistEntry } from '../utils/wishlistEntry';
+import { useCachedThumb } from '../services/thumbnailCache';
+import { LicenseModal } from '../components/LicenseModal';
+import { ProUpgradeModal } from '../components/ProUpgradeModal';
 import { colors, radius, spacing } from '../theme';
 
 type AlbumDetailScreenProps = {
@@ -32,18 +44,59 @@ type AlbumDetailScreenProps = {
 
 export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps) {
   const { settings, loaded: settingsLoaded } = useSettings();
+  const { isPro } = useLicense();
   const [release, setRelease] = useState(route.params.release);
   const [priceLoading, setPriceLoading] = useState(false);
+  const [priceFromCache, setPriceFromCache] = useState(false);
+  const [inWishlist, setInWishlist] = useState(false);
+  const [licenseOpen, setLicenseOpen] = useState(false);
+  const [upsellOpen, setUpsellOpen] = useState(false);
+
+  const coverUri = useCachedThumb(
+    release.cover_image_url || release.thumb_url || undefined
+  );
 
   useFocusEffect(
     useCallback(() => {
       const releaseId = route.params.release.release_id;
+      void loadLocalWishlist().then((list) => {
+        setInWishlist(
+          isInWishlist(
+            list,
+            route.params.release.artist_display,
+            route.params.release.title
+          )
+        );
+      });
+
       if (!releaseId || !settingsLoaded) return;
 
       let cancelled = false;
-      setPriceLoading(true);
 
       void (async () => {
+        if (!canFetchPrices(isPro)) {
+          setPriceLoading(false);
+          return;
+        }
+
+        setPriceLoading(true);
+        setPriceFromCache(false);
+
+        const cached = await getCachedPrice(releaseId, settings.currency);
+        if (
+          !cancelled &&
+          !cached.stale &&
+          (cached.lowest != null || cached.numForSale != null)
+        ) {
+          setRelease((prev) => ({
+            ...prev,
+            lowest_price: cached.lowest,
+            num_for_sale: cached.numForSale,
+            price_currency: settings.currency,
+          }));
+          setPriceFromCache(true);
+        }
+
         try {
           const credentials = await getStoredCredentials();
           if (!credentials || cancelled) return;
@@ -60,6 +113,9 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
             num_for_sale: stats.numForSale,
             price_currency: stats.currency,
           }));
+          setPriceFromCache(false);
+        } catch {
+          // keep cache if present
         } finally {
           if (!cancelled) setPriceLoading(false);
         }
@@ -68,11 +124,28 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
       return () => {
         cancelled = true;
       };
-    }, [route.params.release.release_id, settings.currency, settingsLoaded])
+    }, [
+      route.params.release.release_id,
+      route.params.release.artist_display,
+      route.params.release.title,
+      settings.currency,
+      settingsLoaded,
+      isPro,
+    ])
   );
 
   const priceCurrency = release.price_currency || settings.currency;
   const notesText = formatCollectionNotes(release.notes);
+
+  const toggleWishlist = useCallback(async () => {
+    if (inWishlist) {
+      await removeFromWishlist(release.artist_display, release.title);
+      setInWishlist(false);
+    } else {
+      await addToWishlist(rowToWishlistEntry(release));
+      setInWishlist(true);
+    }
+  }, [inWishlist, release]);
 
   return (
     <View style={styles.wrapper}>
@@ -86,42 +159,40 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
       </View>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.coverRow}>
-        {release.cover_image_url ? (
-          <Image
-            source={{ uri: release.cover_image_url }}
-            style={styles.cover}
-            contentFit="cover"
-          />
-        ) : release.thumb_url ? (
-          <Image
-            source={{ uri: release.thumb_url }}
-            style={styles.cover}
-            contentFit="cover"
-          />
-        ) : (
-          <View style={[styles.cover, styles.coverPlaceholder]} />
+          {coverUri ? (
+            <Image
+              source={{ uri: coverUri }}
+              style={styles.cover}
+              contentFit="cover"
+            />
+          ) : (
+            <View style={[styles.cover, styles.coverPlaceholder]} />
+          )}
+        </View>
+
+        <Text style={styles.artist}>{release.artist_display}</Text>
+        <Text style={styles.title}>{release.title}</Text>
+        {(release.year || release.country) && (
+          <Text style={styles.meta}>
+            {[release.year, release.country].filter(Boolean).join(' • ')}
+          </Text>
         )}
-      </View>
 
-      <Text style={styles.artist}>{release.artist_display}</Text>
-      <Text style={styles.title}>{release.title}</Text>
-      {(release.year || release.country) && (
-        <Text style={styles.meta}>
-          {[release.year, release.country].filter(Boolean).join(' • ')}
-        </Text>
-      )}
-
-      <View style={styles.section}>
-        <InfoRow label="Format" value={release.format_str || '—'} />
-        <InfoRow label="Label" value={release.label || '—'} />
-        <InfoRow label="Catalog" value={release.catno || '—'} />
-      </View>
-
-      {(release.lowest_price != null ||
-        release.median_price != null ||
-        priceLoading) && (
         <View style={styles.section}>
-          {priceLoading ? (
+          <InfoRow label="Format" value={release.format_str || '—'} />
+          <InfoRow label="Label" value={release.label || '—'} />
+          <InfoRow label="Catalog" value={release.catno || '—'} />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Marketplace</Text>
+          {!canFetchPrices(isPro) ? (
+            <TouchableOpacity onPress={() => setUpsellOpen(true)}>
+              <Text style={styles.upsellText}>
+                Marketplace prices are included with Pro — tap to unlock
+              </Text>
+            </TouchableOpacity>
+          ) : priceLoading && !priceFromCache ? (
             <View style={styles.priceLoadingRow}>
               <ActivityIndicator size="small" color={colors.accent} />
               <Text style={styles.priceLoadingText}>
@@ -137,34 +208,60 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
                   priceCurrency
                 )}
               />
-              <InfoRow
-                label="Median"
-                value={formatMarketplacePrice(
-                  release.median_price,
-                  priceCurrency
-                )}
-              />
+              {release.num_for_sale != null ? (
+                <InfoRow
+                  label="For sale"
+                  value={String(release.num_for_sale)}
+                />
+              ) : null}
+              {priceFromCache && priceLoading ? (
+                <Text style={styles.cacheHint}>Cached · refreshing…</Text>
+              ) : priceFromCache ? (
+                <Text style={styles.cacheHint}>From cache</Text>
+              ) : null}
             </>
           )}
         </View>
-      )}
 
-      {notesText ? (
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Notes</Text>
-          <Text style={styles.notes}>{notesText}</Text>
+        {notesText ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Notes</Text>
+            <Text style={styles.notes}>{notesText}</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.actions}>
+          {release.discogs_url ? (
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => openDiscogsUrl(release.discogs_url)}
+            >
+              <Text style={styles.actionBtnText}>Open on Discogs</Text>
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() =>
+              void openAlbumOnSpotify(release.artist_display, release.title)
+            }
+          >
+            <Text style={styles.actionBtnText}>Open on Spotify</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionBtn} onPress={() => void toggleWishlist()}>
+            <Text style={styles.actionBtnText}>
+              {inWishlist ? 'Remove from Wishlist' : 'Add to Wishlist'}
+            </Text>
+          </TouchableOpacity>
         </View>
-      ) : null}
-
-      {release.discogs_url ? (
-        <TouchableOpacity
-          style={styles.discogsButton}
-          onPress={() => openDiscogsUrl(release.discogs_url)}
-        >
-          <Text style={styles.discogsButtonText}>Open on Discogs</Text>
-        </TouchableOpacity>
-      ) : null}
       </ScrollView>
+
+      <ProUpgradeModal
+        visible={upsellOpen}
+        feature="Marketplace prices"
+        onClose={() => setUpsellOpen(false)}
+        onOpenLicense={() => setLicenseOpen(true)}
+      />
+      <LicenseModal visible={licenseOpen} onClose={() => setLicenseOpen(false)} />
     </View>
   );
 }
@@ -259,6 +356,15 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 14,
   },
+  upsellText: {
+    color: colors.accent,
+    fontSize: 14,
+  },
+  cacheHint: {
+    marginTop: spacing.xs,
+    fontSize: 12,
+    color: colors.textMuted,
+  },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -277,14 +383,17 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: 22,
   },
-  discogsButton: {
+  actions: {
     marginTop: spacing.xxl,
+    gap: spacing.sm,
+  },
+  actionBtn: {
     padding: spacing.lg,
     backgroundColor: colors.accent,
     borderRadius: radius.sm,
     alignItems: 'center',
   },
-  discogsButtonText: {
+  actionBtnText: {
     color: colors.white,
     fontSize: 16,
     fontWeight: '600',

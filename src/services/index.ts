@@ -29,7 +29,29 @@ export {
 export {
   exportAndShare,
   type ExportFormat,
+  type ExportResult,
 } from './exportShare';
+
+export {
+  activateLicense,
+  deactivateLicense,
+  generateLicenseKey,
+  isPro,
+  isProCached,
+  licenseSummary,
+  refreshProStatus,
+  __setLicenseSecretForTests,
+  __resetProCacheForTests,
+} from './licensing';
+
+export {
+  FREE_RECORD_LIMIT,
+  applyRecordLimit,
+  canFetchPrices,
+  canUseAbcDividers,
+  canUseManualOrder,
+  upgradeMessage,
+} from './featureGate';
 
 export { loadSettings, saveSettings, updateSettings, formatsToSet } from './settings';
 
