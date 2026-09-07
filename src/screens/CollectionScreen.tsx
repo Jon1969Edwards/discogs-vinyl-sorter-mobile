@@ -9,20 +9,23 @@ import {
   StyleSheet,
   FlatList,
   SectionList,
-  Image,
   TouchableOpacity,
   ActivityIndicator,
   Platform,
   RefreshControl,
 } from 'react-native';
+import { Image } from 'expo-image';
 import type { ReleaseRow } from '../types';
 import type { ManualReorderListProps } from '../components/ManualReorderList';
 import { CollectionHeader } from '../components/CollectionHeader';
 import { CollectionSearchBar } from '../components/CollectionSearchBar';
+import { CollectionSkeleton } from '../components/ui/CollectionSkeleton';
+import { colors, radius, spacing } from '../theme';
 import { useCollection } from '../hooks/useCollection';
 import { useCollectionWatch } from '../hooks/useCollectionWatch';
 import { useSettings } from '../context/SettingsContext';
 import { sortRows, getSectionLetter } from '../utils';
+import { formatListPrice } from '../utils/formatPrice';
 import { releaseRowKey } from '../utils/releaseRowKey';
 import { GUI_BUILD_SORT } from '../types';
 import {
@@ -65,7 +68,7 @@ function ReorderListLoader(props: ManualReorderListProps) {
   if (!List) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#e94560" />
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }
@@ -76,14 +79,25 @@ function ReorderListLoader(props: ManualReorderListProps) {
 function AlbumRow({
   item,
   onPress,
+  showPrices,
+  currency,
 }: {
   item: ReleaseRow;
   onPress: () => void;
+  showPrices: boolean;
+  currency: string;
 }) {
+  const priceLine = formatListPrice(item, currency, showPrices);
+
   return (
     <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
       {item.thumb_url ? (
-        <Image source={{ uri: item.thumb_url }} style={styles.thumb} />
+        <Image
+          source={{ uri: item.thumb_url }}
+          style={[styles.thumb, styles.thumbImage]}
+          contentFit="cover"
+          transition={200}
+        />
       ) : (
         <View style={[styles.thumb, styles.thumbPlaceholder]} />
       )}
@@ -97,6 +111,11 @@ function AlbumRow({
         {(item.year != null || item.country) ? (
           <Text style={styles.meta} numberOfLines={1}>
             {[item.year, item.country].filter((v) => v != null && v !== '').join(' • ')}
+          </Text>
+        ) : null}
+        {priceLine ? (
+          <Text style={styles.priceMeta} numberOfLines={1}>
+            {priceLine}
           </Text>
         ) : null}
       </View>
@@ -287,8 +306,8 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
     <RefreshControl
       refreshing={isRefreshing}
       onRefresh={handleRefresh}
-      tintColor="#e94560"
-      colors={['#e94560']}
+      tintColor={colors.accent}
+      colors={[colors.accent]}
       enabled={!reorderMode && !!credentials}
     />
   );
@@ -296,9 +315,30 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
   if (state.status === 'loading') {
     const progress =
       'progress' in state && state.progress != null ? state.progress : null;
+    if (loaded && credentials) {
+      return (
+        <View style={styles.container}>
+          <View style={styles.loadingHeader}>
+            <Text style={styles.loadingText}>
+              {state.message || 'Loading collection…'}
+            </Text>
+            {progress != null ? (
+              <View style={styles.progressTrack}>
+                <View
+                  style={[styles.progressFill, { width: `${progress * 100}%` }]}
+                />
+              </View>
+            ) : (
+              <ActivityIndicator size="small" color={colors.accent} style={styles.loadingSpinner} />
+            )}
+          </View>
+          <CollectionSkeleton />
+        </View>
+      );
+    }
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#e94560" />
+        <ActivityIndicator size="large" color={colors.accent} />
         <Text style={styles.loadingText}>
           {state.message || 'Loading collection…'}
         </Text>
@@ -352,6 +392,10 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
         onSignOut={() => void handleSignOut()}
         onFinishReorder={() => void finishReorder()}
         onResetShelfOrder={() => void resetShelfOrder()}
+        onExportTxt={() => void handleExport('txt')}
+        onExportCsv={() => void handleExport('csv')}
+        onExportJson={() => void handleExport('json')}
+        exportDisabled={exporting || reorderMode || catalogRows.length === 0}
       />
 
       {state.stale ? (
@@ -395,30 +439,6 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
         editable={!reorderMode}
       />
 
-      <View style={styles.exportBar}>
-        <Text style={styles.exportLabel}>Export:</Text>
-        <TouchableOpacity
-          style={[styles.exportBtn, exporting && styles.exportBtnDisabled]}
-          onPress={() => handleExport('txt')}
-          disabled={exporting || reorderMode}
-        >
-          <Text style={styles.exportBtnText}>TXT</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.exportBtn, exporting && styles.exportBtnDisabled]}
-          onPress={() => handleExport('csv')}
-          disabled={exporting || reorderMode}
-        >
-          <Text style={styles.exportBtnText}>CSV</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.exportBtn, exporting && styles.exportBtnDisabled]}
-          onPress={() => handleExport('json')}
-          disabled={exporting || reorderMode}
-        >
-          <Text style={styles.exportBtnText}>JSON</Text>
-        </TouchableOpacity>
-      </View>
       {exportError ? (
         <Text style={styles.exportError}>{exportError}</Text>
       ) : null}
@@ -432,6 +452,8 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
           renderItem={({ item }) => (
             <AlbumRow
               item={item}
+              showPrices={settings.show_prices}
+              currency={settings.currency}
               onPress={() => navigation.navigate('AlbumDetail', { release: item })}
             />
           )}
@@ -455,6 +477,8 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
           renderItem={({ item }) => (
             <AlbumRow
               item={item}
+              showPrices={settings.show_prices}
+              currency={settings.currency}
               onPress={() => navigation.navigate('AlbumDetail', { release: item })}
             />
           )}
@@ -473,22 +497,31 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.background,
   },
   center: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingHeader: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: 48,
+    paddingBottom: spacing.md,
+  },
+  loadingSpinner: {
+    marginTop: spacing.md,
+    alignSelf: 'flex-start',
+  },
   staleBanner: {
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
     paddingVertical: 10,
-    marginBottom: 4,
-    backgroundColor: 'rgba(240, 173, 78, 0.12)',
+    marginBottom: spacing.xs,
+    backgroundColor: colors.warningMuted,
   },
   staleBannerText: {
-    color: '#f0ad4e',
+    color: colors.warning,
     fontSize: 13,
   },
   staleBannerAction: {
@@ -496,150 +529,133 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   pricesBanner: {
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
     paddingVertical: 10,
-    marginBottom: 4,
-    backgroundColor: 'rgba(233, 69, 96, 0.12)',
+    marginBottom: spacing.xs,
+    backgroundColor: colors.accentMuted,
   },
   pricesBannerText: {
-    color: '#e94560',
+    color: colors.accent,
     fontSize: 13,
     marginBottom: 6,
   },
   pricesProgressTrack: {
     height: 3,
-    backgroundColor: '#252542',
+    backgroundColor: colors.surface,
     borderRadius: 2,
     overflow: 'hidden',
   },
   pricesProgressFill: {
     height: '100%',
-    backgroundColor: '#e94560',
+    backgroundColor: colors.accent,
     borderRadius: 2,
   },
   reorderHint: {
-    color: '#888',
+    color: colors.textMuted,
     fontSize: 13,
-    paddingHorizontal: 16,
-    marginBottom: 8,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
   },
   progressTrack: {
     width: '80%',
     maxWidth: 280,
     height: 4,
-    backgroundColor: '#252542',
+    backgroundColor: colors.surface,
     borderRadius: 2,
-    marginTop: 20,
+    marginTop: spacing.lg,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#e94560',
+    backgroundColor: colors.accent,
     borderRadius: 2,
   },
-  exportBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 8,
-    gap: 8,
-  },
-  exportLabel: {
-    color: '#666',
-    fontSize: 14,
-  },
-  exportBtn: {
-    backgroundColor: '#252542',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  exportBtnDisabled: {
-    opacity: 0.5,
-  },
-  exportBtnText: {
-    color: '#e94560',
-    fontSize: 14,
-    fontWeight: '600',
-  },
   exportError: {
-    color: '#e94560',
+    color: colors.accent,
     fontSize: 13,
-    paddingHorizontal: 16,
-    marginBottom: 8,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
   },
   loadingText: {
-    color: '#aaa',
-    marginTop: 16,
+    color: colors.textSecondary,
+    marginTop: spacing.lg,
     textAlign: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: spacing.xl,
   },
   errorText: {
-    color: '#e94560',
+    color: colors.accent,
     textAlign: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: spacing.xl,
   },
   retryButton: {
-    marginTop: 24,
-    padding: 12,
-    backgroundColor: '#e94560',
-    borderRadius: 8,
+    marginTop: spacing.xl,
+    padding: spacing.md,
+    backgroundColor: colors.accent,
+    borderRadius: radius.sm,
   },
   retryButtonText: {
-    color: '#fff',
+    color: colors.white,
     fontWeight: '600',
   },
   signOutButton: {
     backgroundColor: 'transparent',
-    marginTop: 12,
+    marginTop: spacing.md,
   },
   row: {
     flexDirection: 'row',
-    padding: 12,
-    paddingHorizontal: 16,
+    padding: spacing.md,
+    paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#252542',
+    borderBottomColor: colors.surface,
   },
   thumb: {
     width: 48,
     height: 48,
-    borderRadius: 4,
+    borderRadius: radius.sm,
+  },
+  thumbImage: {
+    backgroundColor: colors.surface,
   },
   thumbPlaceholder: {
-    backgroundColor: '#252542',
+    backgroundColor: colors.surface,
   },
   rowText: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: spacing.md,
     justifyContent: 'center',
   },
   artist: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#eee',
+    color: colors.textPrimary,
   },
   title: {
     fontSize: 14,
-    color: '#bbb',
+    color: colors.textSecondary,
   },
   meta: {
     fontSize: 12,
-    color: '#666',
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  priceMeta: {
+    fontSize: 12,
+    color: colors.accent,
     marginTop: 2,
   },
   empty: {
-    color: '#666',
+    color: colors.textMuted,
     textAlign: 'center',
-    padding: 24,
+    padding: spacing.xl,
   },
   sectionHeader: {
-    backgroundColor: '#252542',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
   },
   sectionHeaderText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#e94560',
+    color: colors.accent,
   },
 });

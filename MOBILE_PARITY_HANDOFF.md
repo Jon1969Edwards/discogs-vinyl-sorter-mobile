@@ -1,10 +1,9 @@
 # Mobile app handoff summary
 
 **Repo:** [Jon1969Edwards/discogs-vinyl-sorter-mobile](https://github.com/Jon1969Edwards/discogs-vinyl-sorter-mobile)  
-**Branch with parity work:** `develop` (merge into `develop`, not `main`)  
-**Latest parity merge:** `10d4bcf` — *Merge main into develop: Windows GUI parity on mobile*  
-**Parity implementation commit:** `1ff8f0d` — *Implement Windows GUI parity for collection, settings, and export*  
-**Windows reference commit:** `43141fcaaa671d89de17126937e2ffcc5c3cb179` (`discogs-vinyl-sorter-windows` / `develop`)
+**Product name:** **Spindle** (display / User-Agent). Native `scheme` / package ids remain `discogvinylsorter` for OAuth continuity.  
+**Active branch:** `develop` (feature work); **`main`** tracks releases (merged with `develop` at `4580814` and later)  
+**Windows reference commit:** `880b0826e23573ddfc945168e598481ea7650ee0` (`discogs-vinyl-sorter-windows` / `develop`)
 
 ---
 
@@ -12,9 +11,11 @@
 
 The mobile app is an **Expo SDK 54** port of the **Windows Auto-Sort GUI** collection pipeline: fetch all releases from Discogs, classify formats, filter by user-selected formats (default LP), sort with the same last-name-first / GUI build rules as Windows, optionally attach marketplace prices, apply manual order overrides, cache results, and export TXT/CSV/JSON with letter or ABC shelf dividers.
 
-**Phases A–D are implemented** in code and covered by **19 Jest golden tests** ported from Windows. **Phase E (store/EAS polish)** is still open.
+**Phases A–D are implemented** in code and covered by **33 Jest tests** (domain golden tests plus cache, settings, price formatting, collection notes). **Phase E (store/EAS polish)** is partially done — see `docs/EAS_RELEASE.md` and `docs/STORE_LISTING.md`.
 
-Parity landed on **`develop`** together with pre-existing mobile work: **PAT + OAuth credentials** in SecureStore (web: `localStorage`), **custom Collection/Wishlist tabs**, **stack navigation** for Settings and album detail, and **Android dev-client scripts** (`npm run android`).
+**Post-parity mobile work (on `main`/`develop`):** parallel marketplace price fetch + 7-day price cache, currency dropdown (`CurrencyPicker`), `repriceCollection`, collection header/search/pull-to-refresh, structured collection notes (`formatCollectionNotes`), list price display when `show_prices` is on.
+
+Pre-existing: **PAT + OAuth** in SecureStore, **custom Collection/Wishlist tabs**, stack **Settings** / **album detail**, Android dev-client scripts (`npm run android`).
 
 ---
 
@@ -24,9 +25,9 @@ Parity landed on **`develop`** together with pre-existing mobile work: **PAT + O
 cd F:\Dev\discogs-vinyl-sorter-mobile
 git checkout develop
 npm install
-npm test          # 19 tests — run after any domain change
-npm start         # Expo Go / dev client
-npm run android   # Local emulator via scripts/run-android.js
+npm test          # 33 tests — run after any domain change
+npm run start:lan # Dev client + LAN Metro (preferred on device)
+npm run android   # Local emulator via scripts/run-android.js (often unavailable on Windows)
 ```
 
 **Auth (pick one):**
@@ -36,13 +37,9 @@ npm run android   # Local emulator via scripts/run-android.js
 | **PAT** | Auth screen → Advanced → paste token; validated via `getIdentity` before save |
 | **OAuth** | `.env` with `DISCOGS_CONSUMER_KEY` / `DISCOGS_CONSUMER_SECRET`; Discogs callback `discogvinylsorter://callback` — see `docs/OAUTH_SETUP.md` |
 
-**Publish parity to GitHub:**
+**Device smoke test before release:** `docs/SMOKE_TEST_CHECKLIST.md`
 
-```bash
-git push origin develop
-```
-
-Local `main` was reset to `origin/main`; parity is **not** on `main` until you merge or cherry-pick from `develop`.
+**Release build (standalone APK/AAB):** `docs/EAS_RELEASE.md`
 
 ---
 
@@ -96,7 +93,7 @@ flowchart TD
 3. **Config** (AsyncStorage key `discogs_app_settings`): `formats`, `divider_mode`, `sort_by`, `currency`, `write_json`, `poll_seconds`, `show_prices`, `user_agent`, `per_page`.
 4. **Wishlist:** Local entries + sync from Discogs wantlist during collection build (best-effort).
 5. **Cache:** Full row cache per username; collection item count for stale detection; 7-day price TTL in cache service.
-6. **Prices:** Marketplace stats when `show_prices` or price sort is active.
+6. **Prices:** Marketplace stats when `show_prices` or price sort is active; concurrent fetch + per-currency cache; list rows show price when `show_prices` is on (`formatListPrice`).
 
 ---
 
@@ -121,6 +118,7 @@ flowchart TD
 | `test_sorting.py` | `__tests__/sorting.test.ts` |
 | `test_format_filter.py` | `__tests__/formatFilter.test.ts` |
 | `test_export_dividers.py` | `__tests__/exportDividers.test.ts` |
+| — | `__tests__/collectionCache.test.ts`, `settings.test.ts`, `formatPrice.test.ts`, `collectionNotes.test.ts` |
 
 Windows sibling doc (optional): `discogs-vinyl-sorter-windows/docs/MOBILE_PARITY.md` → links here.
 
@@ -130,7 +128,7 @@ Windows sibling doc (optional): `discogs-vinyl-sorter-windows/docs/MOBILE_PARITY
 
 ### Phase A — Domain + tests
 - [x] `src/domain/` sorting, formatFilter, export (ABC dividers)
-- [x] Jest golden tests (19 passing)
+- [x] Jest golden tests (30 passing)
 - [x] `useCollection` fetch-all → filter → GUI sort
 
 ### Phase B — Settings + auth
@@ -145,6 +143,9 @@ Windows sibling doc (optional): `discogs-vinyl-sorter-windows/docs/MOBILE_PARITY
 - [x] Export TXT/CSV/JSON from Collection
 - [x] Thumbnail cache service
 - [x] **UI:** Manual reorder (`react-native-draggable-flatlist`) in `CollectionScreen` (Reorder / Done / Reset)
+- [x] **UI:** `CollectionHeader`, `CollectionSearchBar`, pull-to-refresh, load progress
+- [x] **UI:** List prices when `show_prices` enabled
+- [x] **UI:** Currency picker + Done/save in `SettingsScreen`
 - [ ] **UI:** `AlbumDetailModal.tsx` present but unused (stack screen used instead)
 
 ### Phase D — Watch + cache
@@ -153,7 +154,10 @@ Windows sibling doc (optional): `discogs-vinyl-sorter-windows/docs/MOBILE_PARITY
 - [x] **UI:** `useCollectionWatch` mounted in `CollectionScreen` (poll + foreground resume)
 
 ### Phase E — Release hardening
-- [ ] EAS Build profiles / store assets
+- [x] EAS profiles in `eas.json` + release guide (`docs/EAS_RELEASE.md`)
+- [x] Store listing draft + privacy policy (`docs/STORE_LISTING.md`, `docs/PRIVACY_POLICY.md`)
+- [x] Device smoke checklist (`docs/SMOKE_TEST_CHECKLIST.md`)
+- [ ] First successful `eas build` on `preview` or `production` profile (run locally; requires EAS login + secrets)
 - [x] Handoff documentation (this file)
 - [x] README / `.env.example` callback URL aligned with `oauthDiscogs.ts` (`discogvinylsorter://callback`)
 
@@ -165,7 +169,7 @@ Windows sibling doc (optional): `discogs-vinyl-sorter-windows/docs/MOBILE_PARITY
 |-------|--------|
 | **Reanimated 4** | Requires `react-native-worklets@0.5.1` (Expo Go match), `babel-preset-expo@~54`, and `import 'react-native-reanimated'` in `index.ts` |
 | **Expo Go** | **Not supported** for this repo (`expo-dev-client` + gesture-handler / reanimated). Use dev client only. |
-| **Dev client** | `npm run android` (first time / after native deps), then `npm start` (`--dev-client`) and open the **Discogs Vinyl Sorter** app — not Expo Go |
+| **Dev client** | `npm run android` (first time / after native deps), then `npm start` (`--dev-client`) and open the **Spindle** app — not Expo Go |
 | **Sort order** | Last-name-first matches Windows GUI (e.g. Bryan Adams before Alphaville by shelf letter) — not a bug |
 
 ---
@@ -177,7 +181,7 @@ Windows sibling doc (optional): `discogs-vinyl-sorter-windows/docs/MOBILE_PARITY
 | `vinyl_shelf_order.txt` on disk | Share sheet (`expo-sharing`) |
 | OAuth `http://127.0.0.1:8765/callback` | `discogvinylsorter://callback` |
 | CustomTkinter settings panel | Stack `SettingsScreen` |
-| Treeview drag reorder | Draggable list **planned**, not in UI yet |
+| Treeview drag reorder | Draggable list in `CollectionScreen` |
 | Print via Notepad | Not available |
 | Obfuscated JSON config | SecureStore + AsyncStorage |
 
@@ -211,8 +215,9 @@ python test_export_dividers.py
 3. ~~Wire **manual reorder** UI~~ — done in `CollectionScreen`.
 4. ~~Remove legacy **`src/contexts/SettingsContext.tsx`**~~ — done.
 5. ~~Align **README** / `.env.example` OAuth callback strings~~ — done.
-6. Commit **`docs/MOBILE_PARITY.md`** in the Windows repo (pointer to this file).
-7. Merge **`develop` → `main`** on mobile when ready for release tracking.
+6. ~~**Spindle branding**~~ — display name, About, User-Agent (`src/constants/version.ts`); scheme/package ids unchanged.
+7. Commit **`docs/MOBILE_PARITY.md`** in the Windows repo (pointer to this file).
+8. ~~Merge **`develop` → `main`** on mobile when ready for release tracking.~~ — done (`4580814` fast-forward and ongoing)
 
 ---
 

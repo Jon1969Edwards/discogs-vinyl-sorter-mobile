@@ -3,10 +3,13 @@
  */
 
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { CollectionScreen } from '../screens/CollectionScreen';
 import { WishlistScreen } from '../screens/WishlistScreen';
+import { AppText } from '../components/ui/AppText';
+import { colors, spacing } from '../theme';
 
 type TabId = 'collection' | 'wishlist';
 
@@ -29,34 +32,50 @@ export function MainTabs({ navigation, onSignOut }: MainTabsProps) {
       <View style={[styles.content, activeTab !== 'wishlist' && styles.hidden]}>
         <WishlistScreen navigation={navigation} onSignOut={onSignOut} />
       </View>
-      <View style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+      <View style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'collection' && styles.tabActive]}
           onPress={() => setActiveTab('collection')}
           activeOpacity={0.7}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'collection' }}
         >
-          <Text
+          <Ionicons
+            name={activeTab === 'collection' ? 'albums' : 'albums-outline'}
+            size={22}
+            color={activeTab === 'collection' ? colors.accent : colors.textMuted}
+          />
+          <AppText
+            variant="bodySmall"
             style={[
-              styles.tabText,
-              activeTab === 'collection' && styles.tabTextActive,
+              styles.tabLabel,
+              activeTab === 'collection' && styles.tabLabelActive,
             ]}
           >
             Collection
-          </Text>
+          </AppText>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'wishlist' && styles.tabActive]}
           onPress={() => setActiveTab('wishlist')}
           activeOpacity={0.7}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'wishlist' }}
         >
-          <Text
+          <Ionicons
+            name={activeTab === 'wishlist' ? 'bookmark' : 'bookmark-outline'}
+            size={22}
+            color={activeTab === 'wishlist' ? colors.accent : colors.textMuted}
+          />
+          <AppText
+            variant="bodySmall"
             style={[
-              styles.tabText,
-              activeTab === 'wishlist' && styles.tabTextActive,
+              styles.tabLabel,
+              activeTab === 'wishlist' && styles.tabLabelActive,
             ]}
           >
             Wishlist
-          </Text>
+          </AppText>
         </TouchableOpacity>
       </View>
     </View>
@@ -66,7 +85,7 @@ export function MainTabs({ navigation, onSignOut }: MainTabsProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.background,
   },
   content: {
     flex: 1,
@@ -82,27 +101,29 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.background,
     borderTopWidth: 1,
-    borderTopColor: '#252542',
+    borderTopColor: colors.surface,
   },
   tab: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 56,
+    gap: 4,
   },
   tabActive: {
     borderTopWidth: 2,
-    borderTopColor: '#e94560',
+    borderTopColor: colors.accent,
     marginTop: -1,
   },
-  tabText: {
-    fontSize: 14,
+  tabLabel: {
+    color: colors.textMuted,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#666',
   },
-  tabTextActive: {
-    color: '#e94560',
+  tabLabelActive: {
+    color: colors.accent,
   },
 });

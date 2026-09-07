@@ -1,5 +1,5 @@
 /**
- * Discogs Vinyl Sorter – Mobile
+ * Spindle – Mobile
  */
 
 import React, { useState, useEffect } from 'react';

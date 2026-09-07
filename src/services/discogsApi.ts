@@ -16,9 +16,10 @@ import {
   batchSetCachedPrices,
   getFreshPriceEntries,
 } from './collectionCache';
+import { DEFAULT_USER_AGENT } from '../constants/version';
 
 const API_BASE = 'https://api.discogs.com';
-const USER_AGENT = 'DiscogsVinylSorter/1.0 (https://github.com/discogs-vinyl-sorter-mobile)';
+const USER_AGENT = DEFAULT_USER_AGENT;
 
 function hmacSha1Base64(message: string, key: string): string {
   const hash = CryptoJS.HmacSHA1(message, key);

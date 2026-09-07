@@ -8,12 +8,12 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  Text,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
   Linking,
   ScrollView,
+  Image,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import {
@@ -26,8 +26,15 @@ import {
   getStoredCredentials,
 } from '../services';
 import { runOAuthFlow } from '../services/oauthDiscogs';
+import { Screen } from '../components/ui/Screen';
+import { AppText } from '../components/ui/AppText';
+import { Button } from '../components/ui/Button';
+import { colors, radius, spacing } from '../theme';
+import { APP_NAME, DISCOGS_DISCLAIMER } from '../constants/version';
 
 const DISCOGS_TOKEN_URL = 'https://www.discogs.com/settings/developers';
+
+const logoMark = require('../../assets/logo-mark.png');
 
 interface AuthScreenProps {
   onAuthenticated: () => void;
@@ -120,229 +127,214 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
 
   if (checkingStored) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#e94560" />
-      </View>
+      <Screen style={styles.center}>
+        <ActivityIndicator size="large" color={colors.accent} />
+      </Screen>
     );
   }
 
-  const isOauthLoading = oauthLoading;
-  const isSubmitLoading = loading;
-  const anyLoading = isOauthLoading || isSubmitLoading;
+  const anyLoading = oauthLoading || loading;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+    <Screen edges={[]}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.content}>
-          <Text style={styles.title}>Discogs Vinyl Sorter</Text>
-          <Text style={styles.subtitle}>
-            Sign in with Discogs to load your collection.
-          </Text>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.content}>
+            <Image source={logoMark} style={styles.logo} accessibilityLabel="App logo" />
+            <AppText variant="titleLarge" style={styles.title}>
+              {APP_NAME}
+            </AppText>
+            <AppText variant="body" style={styles.subtitle}>
+              Sign in with Discogs to load your collection.
+            </AppText>
 
-          {!showManualEntry ? (
-            <>
-              <TouchableOpacity
-                style={[styles.oauthButton, anyLoading && styles.buttonDisabled]}
-                onPress={handleOAuthSignIn}
-                disabled={anyLoading}
-                activeOpacity={0.7}
-              >
-                {isOauthLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.oauthButtonText}>Sign in with Discogs</Text>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.linkButton}
-                onPress={() => setShowManualEntry(true)}
-                disabled={anyLoading}
-              >
-                <Text style={styles.linkText}>
-                  Or enter a Personal Access Token
-                </Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <>
-              <Text style={styles.hint}>
-                Paste a token from Discogs (Settings → Developers → Generate
-                token).
-              </Text>
-
-              <TouchableOpacity
-                style={styles.linkButton}
-                onPress={handleOpenDiscogs}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.linkText}>Open Discogs to get token</Text>
-              </TouchableOpacity>
-
-              <View style={styles.inputRow}>
-                <TextInput
-                  style={[styles.input, styles.inputFlex]}
-                  placeholder="Paste your token here"
-                  placeholderTextColor="#666"
-                  value={token}
-                  onChangeText={(v) => {
-                    setToken(v);
-                    setError(null);
-                  }}
-                  secureTextEntry
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={!anyLoading}
+            {!showManualEntry ? (
+              <>
+                <Button
+                  title="Sign in with Discogs"
+                  onPress={handleOAuthSignIn}
+                  loading={oauthLoading}
+                  disabled={anyLoading}
+                  style={styles.primaryBtn}
                 />
+
                 <TouchableOpacity
-                  style={styles.pasteButton}
-                  onPress={handlePaste}
+                  style={styles.linkButton}
+                  onPress={() => setShowManualEntry(true)}
                   disabled={anyLoading}
                 >
-                  <Text style={styles.pasteButtonText}>Paste</Text>
+                  <AppText variant="accent" style={styles.linkText}>
+                    Or enter a Personal Access Token
+                  </AppText>
                 </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <AppText variant="caption" style={styles.hint}>
+                  Paste a token from Discogs (Settings → Developers → Generate
+                  token).
+                </AppText>
+
+                <TouchableOpacity
+                  style={styles.linkButton}
+                  onPress={handleOpenDiscogs}
+                  activeOpacity={0.7}
+                >
+                  <AppText variant="accent" style={styles.linkText}>
+                    Open Discogs to get token
+                  </AppText>
+                </TouchableOpacity>
+
+                <View style={styles.inputRow}>
+                  <TextInput
+                    style={[styles.input, styles.inputFlex]}
+                    placeholder="Paste your token here"
+                    placeholderTextColor={colors.textMuted}
+                    value={token}
+                    onChangeText={(v) => {
+                      setToken(v);
+                      setError(null);
+                    }}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    editable={!anyLoading}
+                  />
+                  <TouchableOpacity
+                    style={styles.pasteButton}
+                    onPress={handlePaste}
+                    disabled={anyLoading}
+                  >
+                    <AppText variant="accent">Paste</AppText>
+                  </TouchableOpacity>
+                </View>
+
+                <Button
+                  title="Continue"
+                  variant="secondary"
+                  onPress={handleSubmit}
+                  loading={loading}
+                  disabled={anyLoading}
+                />
+
+                <TouchableOpacity
+                  style={styles.backLink}
+                  onPress={() => setShowManualEntry(false)}
+                  disabled={anyLoading}
+                >
+                  <AppText variant="accent" style={styles.linkText}>
+                    ← Back to Sign in with Discogs
+                  </AppText>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {error ? (
+              <View style={styles.errorCard}>
+                <AppText variant="bodySmall" style={styles.errorText}>
+                  {error}
+                </AppText>
               </View>
+            ) : null}
 
-              <TouchableOpacity
-                style={[styles.button, anyLoading && styles.buttonDisabled]}
-                onPress={handleSubmit}
-                disabled={anyLoading}
-              >
-                {isSubmitLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>Continue</Text>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.backLink}
-                onPress={() => setShowManualEntry(false)}
-                disabled={anyLoading}
-              >
-                <Text style={styles.linkText}>← Back to Sign in with Discogs</Text>
-              </TouchableOpacity>
-            </>
-          )}
-
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            <AppText variant="caption" style={styles.disclaimer}>
+              {DISCOGS_DISCLAIMER}
+            </AppText>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#1a1a2e',
-    justifyContent: 'center',
-  },
-  center: {
-    flex: 1,
-    backgroundColor: '#1a1a2e',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  flex: { flex: 1, justifyContent: 'center' },
+  center: { justifyContent: 'center', alignItems: 'center' },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingVertical: 24,
+    paddingVertical: spacing.xl,
   },
   content: {
-    padding: 24,
+    padding: spacing.xl,
+    alignItems: 'center',
+  },
+  logo: {
+    width: 96,
+    height: 96,
+    marginBottom: spacing.lg,
+    borderRadius: radius.lg,
   },
   title: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    color: '#eee',
-    marginBottom: 8,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#aaa',
-    marginBottom: 24,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
   },
   hint: {
-    fontSize: 13,
-    color: '#666',
-    marginBottom: 16,
+    marginBottom: spacing.lg,
+    textAlign: 'center',
   },
-  oauthButton: {
-    backgroundColor: '#e94560',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  oauthButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+  primaryBtn: {
+    alignSelf: 'stretch',
+    marginBottom: spacing.lg,
   },
   linkButton: {
-    marginBottom: 20,
-    padding: 12,
-    backgroundColor: 'transparent',
+    marginBottom: spacing.lg,
+    padding: spacing.md,
   },
   backLink: {
-    marginTop: 16,
-    padding: 12,
+    marginTop: spacing.lg,
+    padding: spacing.md,
   },
   linkText: {
-    color: '#e94560',
-    fontSize: 15,
     textAlign: 'center',
   },
   inputRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+    alignSelf: 'stretch',
   },
   input: {
-    backgroundColor: '#252542',
-    borderRadius: 8,
-    padding: 16,
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    padding: spacing.lg,
     fontSize: 16,
-    color: '#fff',
+    color: colors.textPrimary,
   },
   inputFlex: {
     flex: 1,
   },
   pasteButton: {
-    backgroundColor: '#252542',
-    borderRadius: 8,
-    paddingHorizontal: 20,
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.lg,
     justifyContent: 'center',
+    minHeight: 48,
   },
-  pasteButtonText: {
-    color: '#e94560',
-    fontSize: 15,
-    fontWeight: '600',
+  errorCard: {
+    alignSelf: 'stretch',
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    padding: spacing.lg,
+    marginTop: spacing.lg,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent,
   },
-  error: {
-    color: '#e94560',
-    fontSize: 14,
-    marginTop: 16,
+  errorText: {
+    color: colors.textPrimary,
   },
-  button: {
-    backgroundColor: '#252542',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+  disclaimer: {
+    marginTop: spacing.xl,
+    textAlign: 'center',
   },
 });

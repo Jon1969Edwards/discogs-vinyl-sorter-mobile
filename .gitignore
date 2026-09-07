@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+assets/icon-source.png
 
 # Expo
 .expo/

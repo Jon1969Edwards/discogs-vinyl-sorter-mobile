@@ -7,6 +7,7 @@ import * as Linking from 'expo-linking';
 import OAuth from 'oauth-1.0a';
 import CryptoJS from 'crypto-js';
 import { DISCOGS_CONSUMER_KEY, DISCOGS_CONSUMER_SECRET } from '@env';
+import { DEFAULT_USER_AGENT } from '../constants/version';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -15,8 +16,7 @@ const OAUTH_REQUEST_URL = `${API_BASE}/oauth/request_token`;
 const OAUTH_ACCESS_URL = `${API_BASE}/oauth/access_token`;
 const OAUTH_AUTHORIZE_URL = 'https://www.discogs.com/oauth/authorize';
 const CALLBACK_URL = 'discogvinylsorter://callback';
-const USER_AGENT =
-  'DiscogsVinylSorter/1.0 (https://github.com/discogs-vinyl-sorter-mobile)';
+const USER_AGENT = DEFAULT_USER_AGENT;
 
 function createOAuth(consumerKey: string, consumerSecret: string) {
   return new OAuth({

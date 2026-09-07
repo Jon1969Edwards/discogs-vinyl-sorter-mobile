@@ -8,10 +8,10 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Image,
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useFocusEffect } from '@react-navigation/native';
 import type { ReleaseRow } from '../types';
 import { useSettings } from '../context/SettingsContext';
@@ -23,6 +23,7 @@ import {
 import { formatCollectionNotes } from '../utils/collectionNotes';
 import { formatMarketplacePrice } from '../utils/formatPrice';
 import { openDiscogsUrl } from '../utils/discogsLinking';
+import { colors, radius, spacing } from '../theme';
 
 type AlbumDetailScreenProps = {
   route: { params: { release: ReleaseRow } };
@@ -89,13 +90,13 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
           <Image
             source={{ uri: release.cover_image_url }}
             style={styles.cover}
-            resizeMode="cover"
+            contentFit="cover"
           />
         ) : release.thumb_url ? (
           <Image
             source={{ uri: release.thumb_url }}
             style={styles.cover}
-            resizeMode="cover"
+            contentFit="cover"
           />
         ) : (
           <View style={[styles.cover, styles.coverPlaceholder]} />
@@ -122,7 +123,7 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
         <View style={styles.section}>
           {priceLoading ? (
             <View style={styles.priceLoadingRow}>
-              <ActivityIndicator size="small" color="#e94560" />
+              <ActivityIndicator size="small" color={colors.accent} />
               <Text style={styles.priceLoadingText}>
                 Loading {settings.currency} price…
               </Text>
@@ -181,70 +182,70 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
     paddingTop: 48,
-    paddingBottom: 12,
+    paddingBottom: spacing.md,
   },
   backButton: {
-    paddingVertical: 8,
-    paddingRight: 16,
+    paddingVertical: spacing.sm,
+    paddingRight: spacing.lg,
   },
   backButtonText: {
-    color: '#e94560',
+    color: colors.accent,
     fontSize: 16,
   },
   container: {
     flex: 1,
   },
   content: {
-    padding: 20,
+    padding: spacing.lg,
     paddingBottom: 40,
   },
   coverRow: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: spacing.lg,
   },
   cover: {
     width: 200,
     height: 200,
-    borderRadius: 8,
+    borderRadius: radius.sm,
   },
   coverPlaceholder: {
-    backgroundColor: '#252542',
+    backgroundColor: colors.surface,
   },
   artist: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#eee',
+    color: colors.textPrimary,
     textAlign: 'center',
   },
   title: {
     fontSize: 18,
-    color: '#bbb',
+    color: colors.textSecondary,
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
   meta: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textMuted,
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   section: {
-    marginTop: 24,
-    paddingTop: 16,
+    marginTop: spacing.xl,
+    paddingTop: spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: '#252542',
+    borderTopColor: colors.surface,
   },
   sectionLabel: {
     fontSize: 12,
-    color: '#666',
-    marginBottom: 8,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -252,10 +253,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 8,
+    paddingVertical: spacing.sm,
   },
   priceLoadingText: {
-    color: '#888',
+    color: colors.textMuted,
     fontSize: 14,
   },
   infoRow: {
@@ -265,26 +266,26 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textMuted,
   },
   infoValue: {
     fontSize: 14,
-    color: '#eee',
+    color: colors.textPrimary,
   },
   notes: {
     fontSize: 14,
-    color: '#bbb',
+    color: colors.textSecondary,
     lineHeight: 22,
   },
   discogsButton: {
-    marginTop: 32,
-    padding: 16,
-    backgroundColor: '#e94560',
-    borderRadius: 8,
+    marginTop: spacing.xxl,
+    padding: spacing.lg,
+    backgroundColor: colors.accent,
+    borderRadius: radius.sm,
     alignItems: 'center',
   },
   discogsButtonText: {
-    color: '#fff',
+    color: colors.white,
     fontSize: 16,
     fontWeight: '600',
   },
