@@ -1,6 +1,8 @@
 /**
- * Shared types for Discogs Vinyl Sorter (aligned with Windows core/models.py)
+ * Shared types for Spindle (aligned with Windows core/models.py)
  */
+
+import { DEFAULT_USER_AGENT } from '../constants/version';
 
 export type FormatCategory =
   | 'vinyl'
@@ -99,7 +101,7 @@ export interface AppSettings {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  user_agent: 'DiscogsVinylSorter/1.0 (+contact)',
+  user_agent: DEFAULT_USER_AGENT,
   formats: ['lp'],
   divider_mode: 'none',
   sort_by: 'artist',

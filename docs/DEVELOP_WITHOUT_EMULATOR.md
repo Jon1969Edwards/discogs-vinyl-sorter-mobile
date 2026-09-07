@@ -39,7 +39,7 @@ If you see `unauthorized`, unlock the phone and accept the prompt. If `offline`,
 npm run android:device
 ```
 
-This runs `expo run:android` and installs **Discogs Vinyl Sorter** (dev client) on the phone. It **will not** start an emulator.
+This runs `expo run:android` and installs **Spindle** (dev client) on the phone. It **will not** start an emulator.
 
 ### 4. Daily JavaScript work
 
@@ -47,7 +47,7 @@ This runs `expo run:android` and installs **Discogs Vinyl Sorter** (dev client) 
 npm start
 ```
 
-On the phone, open **Discogs Vinyl Sorter** (not Expo Go). Shake device or use the dev menu to reload after code changes.
+On the phone, open **Spindle** (not Expo Go). Shake device or use the dev menu to reload after code changes.
 
 ---
 
@@ -118,7 +118,7 @@ If EAS asks **“Install and run on an emulator?”** → answer **No** (your PC
 npm start
 ```
 
-Open **Discogs Vinyl Sorter** on the phone. Prefer **same Wi‑Fi + LAN** (see below). Tunnel is optional.
+Open **Spindle** on the phone. Prefer **same Wi‑Fi + LAN** (see below). Tunnel is optional.
 
 Rebuild the dev client only when you change native dependencies or `app.json` plugins — not for normal TS/React edits.
 
@@ -147,9 +147,9 @@ Check [ngrok status](https://status.ngrok.com/) and [Expo issue #43335](https://
 
 ### Red screen: `RNGestureHandlerModule could not be found`
 
-The APK was built from an outdated `android/` tree (native modules not linked), or you used **Expo Go** instead of **Discogs Vinyl Sorter**. This project requires **`newArchEnabled=true`** (Reanimated 4.x); do not set it to `false`.
+The APK was built from an outdated `android/` tree (native modules not linked), or you used **Expo Go** instead of **Spindle**. This project requires **`newArchEnabled=true`** (Reanimated 4.x); do not set it to `false`.
 
-1. Uninstall both **Expo Go** and **Discogs Vinyl Sorter** on the phone.
+1. Uninstall both **Expo Go** and **Spindle** on the phone.
 2. Rebuild with a clean cache:
 
 ```powershell

@@ -1,8 +1,8 @@
-# Privacy policy — Discogs Vinyl Sorter (mobile)
+# Privacy policy — Spindle (mobile)
 
-**Last updated:** 2026-06-04  
-**App:** Discogs Vinyl Sorter (Android)  
-**Contact:** Replace with your support email before publishing to Google Play.
+**Last updated:** 2026-09-07  
+**App:** Spindle (Android)  
+**Contact:** jon1969edwards@gmail.com
 
 ## Summary
 

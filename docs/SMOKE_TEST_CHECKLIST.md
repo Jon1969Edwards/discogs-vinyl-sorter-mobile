@@ -5,7 +5,7 @@ Run after merging to `main` or before an EAS release build. Requires the **dev c
 ## Setup
 
 1. On PC: `npm run start:lan` (if port 8081 is busy, stop the old Metro process first).
-2. On phone: open **Discogs Vinyl Sorter** dev app → connect to `http://<PC_LAN_IP>:8081` (e.g. `http://192.168.50.166:8081`).
+2. On phone: open **Spindle** dev app → connect to `http://<PC_LAN_IP>:8081` (e.g. `http://192.168.50.166:8081`).
 3. Automated gate (PC): `npm test` — all **33** tests should pass.
 
 ## Checklist

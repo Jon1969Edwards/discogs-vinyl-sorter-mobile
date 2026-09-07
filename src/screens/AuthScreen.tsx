@@ -30,6 +30,7 @@ import { Screen } from '../components/ui/Screen';
 import { AppText } from '../components/ui/AppText';
 import { Button } from '../components/ui/Button';
 import { colors, radius, spacing } from '../theme';
+import { APP_NAME, DISCOGS_DISCLAIMER } from '../constants/version';
 
 const DISCOGS_TOKEN_URL = 'https://www.discogs.com/settings/developers';
 
@@ -147,7 +148,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
           <View style={styles.content}>
             <Image source={logoMark} style={styles.logo} accessibilityLabel="App logo" />
             <AppText variant="titleLarge" style={styles.title}>
-              Discogs Vinyl Sorter
+              {APP_NAME}
             </AppText>
             <AppText variant="body" style={styles.subtitle}>
               Sign in with Discogs to load your collection.
@@ -243,7 +244,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
             ) : null}
 
             <AppText variant="caption" style={styles.disclaimer}>
-              Not affiliated with Discogs.
+              {DISCOGS_DISCLAIMER}
             </AppText>
           </View>
         </ScrollView>

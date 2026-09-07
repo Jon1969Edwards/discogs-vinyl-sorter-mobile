@@ -4,7 +4,7 @@ Fill in bracketed placeholders before submission.
 
 ## App name
 
-Discogs Vinyl Sorter
+Spindle
 
 ## Short description (80 chars max)
 
@@ -12,7 +12,7 @@ Sort your Discogs vinyl collection for the shelf. Export TXT, CSV, or JSON.
 
 ## Full description
 
-Discogs Vinyl Sorter fetches your Discogs collection, filters to the formats you care about (LP by default), and sorts it the same way as the desktop Vinyl Sorter — including last-name-first artist order and optional A–Z or shelf dividers.
+Spindle fetches your Discogs collection, filters to the formats you care about (LP by default), and sorts it the same way as the desktop Spindle app — including last-name-first artist order and optional A–Z or shelf dividers.
 
 **Features**
 

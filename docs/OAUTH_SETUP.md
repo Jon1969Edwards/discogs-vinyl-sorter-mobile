@@ -11,16 +11,17 @@ If OAuth is not configured, use **Advanced: use Personal Access Token** and past
 ## For developers
 
 1. Create a Discogs application at [discogs.com/settings/developers](https://www.discogs.com/settings/developers).
-2. Set **Callback URL** to: `discogvinylsorter://callback`
-3. Copy Consumer Key and Consumer Secret into `.env`:
+2. Set **Application Name** to `Spindle` (or `Spindle Mobile`).
+3. Set **Callback URL** to: `discogvinylsorter://callback`
+4. Copy Consumer Key and Consumer Secret into `.env`:
 
 ```
 DISCOGS_CONSUMER_KEY=your_key
 DISCOGS_CONSUMER_SECRET=your_secret
 ```
 
-4. Ensure `app.json` includes `"scheme": "discogvinylsorter"`.
-5. Rebuild or restart Expo after changing `.env`.
+5. Ensure `app.json` includes `"scheme": "discogvinylsorter"` (unchanged from legacy package id — do not rename without updating Discogs + rebuilding native clients).
+6. Rebuild or restart Expo after changing `.env`.
 
 ## Windows vs mobile callbacks
 

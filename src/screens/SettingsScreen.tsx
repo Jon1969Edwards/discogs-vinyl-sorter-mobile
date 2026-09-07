@@ -19,6 +19,12 @@ import type { DiscogsCurrency } from '../types';
 import { AppText } from '../components/ui/AppText';
 import { SettingsSection } from '../components/ui/SettingsSection';
 import { colors, radius, spacing } from '../theme';
+import {
+  APP_NAME,
+  APP_VERSION,
+  DISCOGS_DISCLAIMER,
+  SUPPORT_EMAIL,
+} from '../constants/version';
 
 const DIVIDER_OPTIONS: { id: DividerMode; label: string }[] = [
   { id: 'none', label: 'None' },
@@ -289,6 +295,18 @@ export function SettingsScreen({
           />
         </SettingsSection>
 
+        <SettingsSection title="About">
+          <AppText variant="body" style={styles.aboutTitle}>
+            {APP_NAME} {APP_VERSION}
+          </AppText>
+          <AppText variant="caption" style={styles.aboutCaption}>
+            {DISCOGS_DISCLAIMER}
+          </AppText>
+          <AppText variant="caption" style={styles.aboutCaption}>
+            Support: {SUPPORT_EMAIL}
+          </AppText>
+        </SettingsSection>
+
         <SettingsSection title="Account">
           <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
             <AppText style={styles.signOutText}>Sign Out</AppText>
@@ -376,6 +394,12 @@ const styles = StyleSheet.create({
   saveCurrencyBtnText: { fontWeight: '700' },
   currencyHint: {
     marginTop: spacing.sm,
+  },
+  aboutTitle: {
+    marginBottom: spacing.xs,
+  },
+  aboutCaption: {
+    marginBottom: spacing.xs,
   },
   signOutBtn: {
     backgroundColor: colors.accent,

@@ -1,6 +1,8 @@
-# Discogs Vinyl Sorter – Mobile
+# Spindle – Mobile
 
-React Native (Expo) app that replicates the Discogs Vinyl Sorter for Android and iOS. Connects to the Discogs API, fetches your collection, sorts LPs by artist/title/year, and lets you export TXT/CSV/JSON.
+React Native (Expo) companion to the Windows **Spindle** app. Connects to the Discogs API, fetches your collection, sorts LPs by artist/title/year, and lets you export TXT/CSV/JSON.
+
+Not affiliated with Discogs.
 
 ## Prerequisites
 
@@ -20,6 +22,7 @@ npm install
 2. (Recommended) For OAuth "Sign in with Discogs", copy `.env.example` to `.env`:
 
    - Create an app at [Discogs → Settings → Developers](https://www.discogs.com/settings/developers)
+   - Application name: **Spindle** (or Spindle Mobile)
    - Add callback URL: `discogvinylsorter://callback` (see `docs/OAUTH_SETUP.md`)
    - Add your consumer key and secret to `.env`
 
@@ -33,7 +36,7 @@ npm start
    - **No emulator / emulator broken?** → [docs/DEVELOP_WITHOUT_EMULATOR.md](./docs/DEVELOP_WITHOUT_EMULATOR.md) (USB phone or EAS cloud APK)
    - **Phone (recommended):** USB debugging on → `adb devices` shows `device` → `npm run android:device`
    - **Emulator (optional):** VT-x enabled in BIOS → `npm run android:emulator` → home screen → `npm run android`
-   - Day-to-day JS: `npm run start:lan`, then open **Discogs Vinyl Sorter** on the phone with `http://YOUR_PC_IP:8081` (not Expo Go; not `localhost`)
+   - Day-to-day JS: `npm run start:lan`, then open **Spindle** on the phone with `http://YOUR_PC_IP:8081` (not Expo Go; not `localhost`)
    - Tunnel (`npm run start:tunnel`) only if LAN fails—see [docs/DEVELOP_WITHOUT_EMULATOR.md](./docs/DEVELOP_WITHOUT_EMULATOR.md) if ngrok errors
 
 If you see `RNGestureHandlerModule could not be found`, you opened the bundle in **Expo Go** or an outdated APK — run `npm run android` once, then use `npm start` and the dev client app.
@@ -47,8 +50,9 @@ src/
 ├── components/   # Reusable UI components
 ├── screens/      # App screens (Auth, Collection, Settings)
 ├── services/     # Discogs API client
-├── utils/        # Sorting, filtering logic
+├── domain/       # Sorting, format filter, export (parity with Windows core/)
 ├── hooks/        # Custom React hooks
+├── constants/    # App name / version (Spindle)
 └── types/        # TypeScript interfaces
 ```
 
@@ -75,5 +79,5 @@ Run `npm test` (33 tests) before merging. Enable **Show prices in list** in Sett
 
 ## Related
 
-- **Windows/Desktop app**: See sibling folder `discogs-vinyl-sorter-windows`
+- **Windows/Desktop app (Spindle)**: See sibling folder `discogs-vinyl-sorter-windows`
 - **Implementation plan**: [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md)

@@ -1,6 +1,11 @@
 # Mobile Version – Implementation Plan (React Native)
 
-Plan for building a mobile app that replicates Discogs Vinyl Sorter functionality in a **separate folder** (sibling to the Windows/Python project). Uses **React Native** so the same codebase targets **Android and iOS**.
+Plan for building a mobile app that replicates **Spindle** (Windows Discogs
+collection sorter) functionality in a **separate folder** (sibling to the
+Windows/Python project). Uses **React Native** so the same codebase targets
+**Android and iOS**.
+
+> Current product name is **Spindle**. See `MOBILE_PARITY_HANDOFF.md` for live status.
 
 ---
 

@@ -1,8 +1,9 @@
 # Mobile app handoff summary
 
 **Repo:** [Jon1969Edwards/discogs-vinyl-sorter-mobile](https://github.com/Jon1969Edwards/discogs-vinyl-sorter-mobile)  
+**Product name:** **Spindle** (display / User-Agent). Native `scheme` / package ids remain `discogvinylsorter` for OAuth continuity.  
 **Active branch:** `develop` (feature work); **`main`** tracks releases (merged with `develop` at `4580814` and later)  
-**Windows reference commit:** `43141fcaaa671d89de17126937e2ffcc5c3cb179` (`discogs-vinyl-sorter-windows` / `develop`)
+**Windows reference commit:** `880b0826e23573ddfc945168e598481ea7650ee0` (`discogs-vinyl-sorter-windows` / `develop`)
 
 ---
 
@@ -168,7 +169,7 @@ Windows sibling doc (optional): `discogs-vinyl-sorter-windows/docs/MOBILE_PARITY
 |-------|--------|
 | **Reanimated 4** | Requires `react-native-worklets@0.5.1` (Expo Go match), `babel-preset-expo@~54`, and `import 'react-native-reanimated'` in `index.ts` |
 | **Expo Go** | **Not supported** for this repo (`expo-dev-client` + gesture-handler / reanimated). Use dev client only. |
-| **Dev client** | `npm run android` (first time / after native deps), then `npm start` (`--dev-client`) and open the **Discogs Vinyl Sorter** app — not Expo Go |
+| **Dev client** | `npm run android` (first time / after native deps), then `npm start` (`--dev-client`) and open the **Spindle** app — not Expo Go |
 | **Sort order** | Last-name-first matches Windows GUI (e.g. Bryan Adams before Alphaville by shelf letter) — not a bug |
 
 ---
@@ -214,8 +215,9 @@ python test_export_dividers.py
 3. ~~Wire **manual reorder** UI~~ — done in `CollectionScreen`.
 4. ~~Remove legacy **`src/contexts/SettingsContext.tsx`**~~ — done.
 5. ~~Align **README** / `.env.example` OAuth callback strings~~ — done.
-6. Commit **`docs/MOBILE_PARITY.md`** in the Windows repo (pointer to this file).
-7. ~~Merge **`develop` → `main`** on mobile when ready for release tracking.~~ — done (`4580814` fast-forward and ongoing)
+6. ~~**Spindle branding**~~ — display name, About, User-Agent (`src/constants/version.ts`); scheme/package ids unchanged.
+7. Commit **`docs/MOBILE_PARITY.md`** in the Windows repo (pointer to this file).
+8. ~~Merge **`develop` → `main`** on mobile when ready for release tracking.~~ — done (`4580814` fast-forward and ongoing)
 
 ---
 
