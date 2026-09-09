@@ -24,6 +24,7 @@ export {
   hasStoredToken,
   clearAllAuth,
   isLocalCredentials,
+  localSessionName,
   type DiscogsCredentials,
 } from './auth';
 

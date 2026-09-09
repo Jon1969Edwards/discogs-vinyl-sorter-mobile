@@ -18,6 +18,7 @@ import { SettingsProvider } from './src/context/SettingsContext';
 import { LicenseProvider } from './src/context/LicenseContext';
 import { hasStoredCredentials } from './src/services';
 import { subscribeOtaUpdateChecks } from './src/services/appUpdates';
+import { AppErrorBoundary } from './src/components/AppErrorBoundary';
 
 const Stack = createNativeStackNavigator();
 
@@ -28,7 +29,16 @@ export default function App() {
     hasStoredCredentials().then(setHasToken);
   }, []);
 
-  useEffect(() => subscribeOtaUpdateChecks(), []);
+  useEffect(() => {
+    let unsub = () => undefined as void;
+    const timer = setTimeout(() => {
+      unsub = subscribeOtaUpdateChecks();
+    }, 1200);
+    return () => {
+      clearTimeout(timer);
+      unsub();
+    };
+  }, []);
 
   const handleAuthenticated = () => setHasToken(true);
   const handleSignOut = () => setHasToken(false);
@@ -43,6 +53,7 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={styles.root}>
+    <AppErrorBoundary>
     <SafeAreaProvider>
       <SettingsProvider>
         <LicenseProvider>
@@ -92,6 +103,7 @@ export default function App() {
         </LicenseProvider>
       </SettingsProvider>
     </SafeAreaProvider>
+    </AppErrorBoundary>
     </GestureHandlerRootView>
   );
 }
@@ -99,6 +111,7 @@ export default function App() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    backgroundColor: '#1a1a2e',
   },
   loading: {
     flex: 1,

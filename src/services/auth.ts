@@ -12,12 +12,17 @@ const LEGACY_TOKEN_KEY = 'discogs_token';
 export type DiscogsCredentials =
   | { type: 'pat'; token: string }
   | { type: 'oauth'; token: string; secret: string }
-  | { type: 'local' };
+  | { type: 'local'; name?: string; email?: string };
 
 export function isLocalCredentials(
   cred: DiscogsCredentials | null | undefined
-): cred is { type: 'local' } {
+): cred is { type: 'local'; name?: string; email?: string } {
   return cred?.type === 'local';
+}
+
+export function localSessionName(cred: DiscogsCredentials | null | undefined): string {
+  if (cred?.type === 'local' && cred.name?.trim()) return cred.name.trim();
+  return 'Imported';
 }
 
 const isWeb = Platform.OS === 'web';
@@ -62,7 +67,14 @@ function parseCredentials(json: string | null): DiscogsCredentials | null {
     if (!parsed || typeof parsed !== 'object') return null;
     const obj = parsed as Record<string, unknown>;
     if (obj.type === 'local') {
-      return { type: 'local' };
+      return {
+        type: 'local',
+        name: typeof obj.name === 'string' && obj.name.trim() ? obj.name.trim() : undefined,
+        email:
+          typeof obj.email === 'string' && obj.email.trim()
+            ? obj.email.trim()
+            : undefined,
+      };
     }
     if (obj.type === 'pat' && typeof obj.token === 'string' && obj.token.trim()) {
       return { type: 'pat', token: obj.token.trim() };

@@ -18,6 +18,10 @@ import { clearAllAuth } from '../services';
 import {
   pickAndImportCollection,
 } from '../services/importCollection';
+import {
+  deleteLocalAccount,
+  getLocalAccount,
+} from '../services/localAccount';
 import type { DiscogsCurrency } from '../types';
 import { AppText } from '../components/ui/AppText';
 import { SettingsSection } from '../components/ui/SettingsSection';
@@ -67,6 +71,16 @@ export function SettingsScreen({
   const [upsellFeature, setUpsellFeature] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [importNote, setImportNote] = useState<string | null>(null);
+  const [localAccount, setLocalAccount] = useState<{
+    name: string;
+    email: string;
+  } | null>(null);
+
+  React.useEffect(() => {
+    getLocalAccount().then((account) => {
+      if (account) setLocalAccount({ name: account.name, email: account.email });
+    });
+  }, []);
 
   React.useEffect(() => {
     if (loaded) setCurrencyDraft(settings.currency);
@@ -102,6 +116,12 @@ export function SettingsScreen({
   );
 
   const handleSignOut = useCallback(async () => {
+    await clearAllAuth();
+    onSignOut();
+  }, [onSignOut]);
+
+  const handleDeleteLocalAccount = useCallback(async () => {
+    await deleteLocalAccount();
     await clearAllAuth();
     onSignOut();
   }, [onSignOut]);
@@ -409,6 +429,21 @@ export function SettingsScreen({
         </SettingsSection>
 
         <SettingsSection title="Account">
+          {localAccount ? (
+            <>
+              <AppText variant="body" style={styles.aboutTitle}>
+                {localAccount.name}
+              </AppText>
+              <AppText variant="caption" style={styles.aboutCaption}>
+                {localAccount.email} · stored on this phone only
+              </AppText>
+            </>
+          ) : (
+            <AppText variant="caption" style={styles.aboutCaption}>
+              Discogs sign-in, or a Spindle account on this device. Import CSV
+              or JSON to sort without Discogs.
+            </AppText>
+          )}
           <AppText variant="caption" style={styles.aboutCaption}>
             Import a CSV or JSON file to sort a collection without Discogs.
             Spindle exports work as-is.
@@ -434,6 +469,16 @@ export function SettingsScreen({
           <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
             <AppText style={styles.signOutText}>Sign Out</AppText>
           </TouchableOpacity>
+          {localAccount ? (
+            <TouchableOpacity
+              style={styles.proBtnSecondary}
+              onPress={() => void handleDeleteLocalAccount()}
+            >
+              <AppText style={styles.proBtnTextSecondary}>
+                Delete Spindle account on this phone
+              </AppText>
+            </TouchableOpacity>
+          ) : null}
         </SettingsSection>
       </ScrollView>
 

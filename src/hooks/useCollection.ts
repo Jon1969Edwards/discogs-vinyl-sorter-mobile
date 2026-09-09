@@ -13,10 +13,10 @@ import {
   attachPricesToRows,
   type DiscogsCollectionRelease,
 } from '../services/discogsApi';
-import { LOCAL_USERNAME } from '../types';
 import {
   getStoredCredentials,
   isLocalCredentials,
+  localSessionName,
   type DiscogsCredentials,
 } from '../services/auth';
 import { loadLocalCollection } from '../services/localCollection';
@@ -91,8 +91,9 @@ export function useCollection() {
           const settings = await loadSettings();
           const pro = await refreshProStatus();
           const allRows = (await loadLocalCollection()) ?? [];
-          await setCacheUsername(LOCAL_USERNAME);
-          await setManualOrderUsername(LOCAL_USERNAME);
+          const localName = localSessionName(credentials);
+          await setCacheUsername(localName);
+          await setManualOrderUsername(localName);
           const formatSet = formatsToSet(settings.formats);
           let processed = filterRowsByFormat(allRows, formatSet);
           processed = await applyGenreOverrides(processed);
@@ -107,12 +108,12 @@ export function useCollection() {
             settings.sort_by as SortBy
           );
           processed = await applyManualOrder(processed);
-          await markFullFetch(LOCAL_USERNAME, allRows.length);
-          await saveCachedRows(LOCAL_USERNAME, processed);
+          await markFullFetch(localName, allRows.length);
+          await saveCachedRows(localName, processed);
           setState({
             status: 'success',
             rows: processed,
-            username: LOCAL_USERNAME,
+            username: localName,
             itemCount: allRows.length,
             stale: false,
             lastSyncedAt: Date.now(),

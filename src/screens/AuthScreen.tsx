@@ -28,8 +28,12 @@ import {
 import {
   applyImportedCollection,
   pickAndImportCollection,
-  startLocalSession,
 } from '../services/importCollection';
+import {
+  createLocalAccount,
+  hasLocalAccount,
+  signInLocalAccount,
+} from '../services/localAccount';
 import { runOAuthFlow } from '../services/oauthDiscogs';
 import { Screen } from '../components/ui/Screen';
 import { AppText } from '../components/ui/AppText';
@@ -53,16 +57,26 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [checkingStored, setCheckingStored] = useState(true);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [showPasteImport, setShowPasteImport] = useState(false);
+  const [showCreateAccount, setShowCreateAccount] = useState(false);
+  const [showLocalLogin, setShowLocalLogin] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [importLoading, setImportLoading] = useState(false);
+  const [localName, setLocalName] = useState('');
+  const [localEmail, setLocalEmail] = useState('');
+  const [localPassword, setLocalPassword] = useState('');
+  const [localConfirm, setLocalConfirm] = useState('');
+  const [hasDeviceAccount, setHasDeviceAccount] = useState(false);
 
   React.useEffect(() => {
-    getStoredCredentials().then((cred) => {
-      setCheckingStored(false);
-      if (cred?.type === 'pat') {
-        setToken(cred.token);
+    Promise.all([getStoredCredentials(), hasLocalAccount()]).then(
+      ([cred, exists]) => {
+        setCheckingStored(false);
+        setHasDeviceAccount(exists);
+        if (cred?.type === 'pat') {
+          setToken(cred.token);
+        }
       }
-    });
+    );
   }, []);
 
   const handleOAuthSignIn = useCallback(async () => {
@@ -176,18 +190,36 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     }
   }, [pasteText, onAuthenticated]);
 
-  const handleSkipDiscogs = useCallback(async () => {
+  const handleCreateAccount = useCallback(async () => {
     setImportLoading(true);
     setError(null);
     try {
-      await startLocalSession();
+      await createLocalAccount({
+        name: localName,
+        email: localEmail,
+        password: localPassword,
+        confirm: localConfirm,
+      });
       onAuthenticated();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not start without Discogs');
+      setError(err instanceof Error ? err.message : 'Could not create account');
     } finally {
       setImportLoading(false);
     }
-  }, [onAuthenticated]);
+  }, [localName, localEmail, localPassword, localConfirm, onAuthenticated]);
+
+  const handleLocalSignIn = useCallback(async () => {
+    setImportLoading(true);
+    setError(null);
+    try {
+      await signInLocalAccount(localEmail, localPassword);
+      onAuthenticated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not sign in');
+    } finally {
+      setImportLoading(false);
+    }
+  }, [localEmail, localPassword, onAuthenticated]);
 
   if (checkingStored) {
     return (
@@ -215,10 +247,112 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               {APP_NAME}
             </AppText>
             <AppText variant="body" style={styles.subtitle}>
-              Sign in with Discogs, or import a CSV/JSON collection.
+              Create a Spindle account on this phone, sign in with Discogs, or
+              import a collection.
             </AppText>
 
-            {showPasteImport ? (
+            {showCreateAccount ? (
+              <>
+                <AppText variant="caption" style={styles.hint}>
+                  Stored only on this device. This is not a Discogs account and
+                  does not sync to a server.
+                </AppText>
+                <TextInput
+                  style={[styles.input, styles.accountInput]}
+                  placeholder="Name"
+                  placeholderTextColor={colors.textMuted}
+                  value={localName}
+                  onChangeText={setLocalName}
+                  autoCapitalize="words"
+                  editable={!anyLoading}
+                />
+                <TextInput
+                  style={[styles.input, styles.accountInput]}
+                  placeholder="Email"
+                  placeholderTextColor={colors.textMuted}
+                  value={localEmail}
+                  onChangeText={setLocalEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  editable={!anyLoading}
+                />
+                <TextInput
+                  style={[styles.input, styles.accountInput]}
+                  placeholder="Password (at least 6 characters)"
+                  placeholderTextColor={colors.textMuted}
+                  value={localPassword}
+                  onChangeText={setLocalPassword}
+                  secureTextEntry
+                  editable={!anyLoading}
+                />
+                <TextInput
+                  style={[styles.input, styles.accountInput]}
+                  placeholder="Confirm password"
+                  placeholderTextColor={colors.textMuted}
+                  value={localConfirm}
+                  onChangeText={setLocalConfirm}
+                  secureTextEntry
+                  editable={!anyLoading}
+                />
+                <Button
+                  title="Create account"
+                  onPress={() => void handleCreateAccount()}
+                  loading={importLoading}
+                  disabled={anyLoading}
+                  style={styles.importBtn}
+                />
+                <TouchableOpacity
+                  style={styles.backLink}
+                  onPress={() => setShowCreateAccount(false)}
+                  disabled={anyLoading}
+                >
+                  <AppText variant="accent" style={styles.linkText}>
+                    ← Back
+                  </AppText>
+                </TouchableOpacity>
+              </>
+            ) : showLocalLogin ? (
+              <>
+                <AppText variant="caption" style={styles.hint}>
+                  Sign in with the email and password you created on this phone.
+                </AppText>
+                <TextInput
+                  style={[styles.input, styles.accountInput]}
+                  placeholder="Email"
+                  placeholderTextColor={colors.textMuted}
+                  value={localEmail}
+                  onChangeText={setLocalEmail}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  editable={!anyLoading}
+                />
+                <TextInput
+                  style={[styles.input, styles.accountInput]}
+                  placeholder="Password"
+                  placeholderTextColor={colors.textMuted}
+                  value={localPassword}
+                  onChangeText={setLocalPassword}
+                  secureTextEntry
+                  editable={!anyLoading}
+                />
+                <Button
+                  title="Sign in"
+                  onPress={() => void handleLocalSignIn()}
+                  loading={importLoading}
+                  disabled={anyLoading}
+                  style={styles.importBtn}
+                />
+                <TouchableOpacity
+                  style={styles.backLink}
+                  onPress={() => setShowLocalLogin(false)}
+                  disabled={anyLoading}
+                >
+                  <AppText variant="accent" style={styles.linkText}>
+                    ← Back
+                  </AppText>
+                </TouchableOpacity>
+              </>
+            ) : showPasteImport ? (
               <>
                 <AppText variant="caption" style={styles.hint}>
                   Paste a Spindle CSV/JSON export, or a spreadsheet with Artist
@@ -265,6 +399,31 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                   style={styles.primaryBtn}
                 />
 
+                <Button
+                  title="Create an account"
+                  variant="secondary"
+                  onPress={() => {
+                    setShowCreateAccount(true);
+                    setError(null);
+                  }}
+                  disabled={anyLoading}
+                  style={styles.importBtn}
+                />
+                {hasDeviceAccount ? (
+                  <TouchableOpacity
+                    style={styles.linkButton}
+                    onPress={() => {
+                      setShowLocalLogin(true);
+                      setError(null);
+                    }}
+                    disabled={anyLoading}
+                  >
+                    <AppText variant="accent" style={styles.linkText}>
+                      Sign in to your Spindle account
+                    </AppText>
+                  </TouchableOpacity>
+                ) : null}
+
                 <TouchableOpacity
                   style={styles.linkButton}
                   onPress={() => setShowManualEntry(true)}
@@ -294,16 +453,6 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                 >
                   <AppText variant="accent" style={styles.linkText}>
                     Or paste CSV / JSON
-                  </AppText>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.linkButton}
-                  onPress={() => void handleSkipDiscogs()}
-                  disabled={anyLoading}
-                >
-                  <AppText variant="caption" style={styles.linkText}>
-                    Continue without Discogs
                   </AppText>
                 </TouchableOpacity>
               </>
@@ -421,6 +570,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   importBtn: {
+    alignSelf: 'stretch',
+    marginBottom: spacing.sm,
+  },
+  accountInput: {
     alignSelf: 'stretch',
     marginBottom: spacing.sm,
   },

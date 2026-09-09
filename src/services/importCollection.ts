@@ -1,16 +1,29 @@
 /**
  * Pick or apply a CSV/JSON collection file (no Discogs).
- * expo-document-picker is loaded only when picking a file so older
- * preview APKs can still apply OTA JS (paste import) without that native module.
+ *
+ * This preview APK has no expo-document-picker native module. Do not import
+ * that package here — Metro would ship it in the OTA bundle and a missing
+ * native module greys out the app on launch.
  */
 
-import * as FileSystem from 'expo-file-system';
 import {
   CollectionImportError,
   parseCollectionText,
 } from '../domain/collectionImport';
-import { setStoredCredentials } from './auth';
+import { getStoredCredentials, setStoredCredentials } from './auth';
+import type { DiscogsCredentials } from './auth';
 import { loadLocalCollection, saveLocalCollection } from './localCollection';
+
+async function keepLocalProfile(
+  extra?: Pick<Extract<DiscogsCredentials, { type: 'local' }>, 'name' | 'email'>
+): Promise<void> {
+  const current = await getStoredCredentials();
+  const name =
+    extra?.name || (current?.type === 'local' ? current.name : undefined);
+  const email =
+    extra?.email || (current?.type === 'local' ? current.email : undefined);
+  await setStoredCredentials({ type: 'local', name, email });
+}
 
 export async function applyImportedCollection(
   text: string,
@@ -18,43 +31,24 @@ export async function applyImportedCollection(
 ): Promise<number> {
   const rows = parseCollectionText(text, filename);
   await saveLocalCollection(rows, filename);
-  await setStoredCredentials({ type: 'local' });
+  await keepLocalProfile();
   return rows.length;
 }
 
-export async function startLocalSession(): Promise<void> {
+export async function startLocalSession(
+  profile?: Pick<Extract<DiscogsCredentials, { type: 'local' }>, 'name' | 'email'>
+): Promise<void> {
   const existing = await loadLocalCollection();
   if (!existing) {
     await saveLocalCollection([], '');
   }
-  await setStoredCredentials({ type: 'local' });
+  await keepLocalProfile(profile);
 }
 
 export async function pickAndImportCollection(): Promise<number | null> {
-  let DocumentPicker: typeof import('expo-document-picker');
-  try {
-    DocumentPicker = await import('expo-document-picker');
-  } catch {
-    throw new CollectionImportError(
-      'File picker is not in this install. Paste CSV or JSON on the sign-in screen instead.'
-    );
-  }
-  const result = await DocumentPicker.getDocumentAsync({
-    type: [
-      'text/csv',
-      'text/comma-separated-values',
-      'application/json',
-      'text/plain',
-      '*/*',
-    ],
-    copyToCacheDirectory: true,
-  });
-  if (result.canceled || !result.assets?.[0]) return null;
-  const asset = result.assets[0];
-  const uri = asset.uri;
-  const name = asset.name || 'collection.csv';
-  const text = await FileSystem.readAsStringAsync(uri);
-  return applyImportedCollection(text, name);
+  throw new CollectionImportError(
+    'File picker needs a newer APK. Use “Or paste CSV / JSON” on the sign-in screen.'
+  );
 }
 
 export { CollectionImportError };
