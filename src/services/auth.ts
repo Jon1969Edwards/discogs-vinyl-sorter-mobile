@@ -11,7 +11,14 @@ const LEGACY_TOKEN_KEY = 'discogs_token';
 
 export type DiscogsCredentials =
   | { type: 'pat'; token: string }
-  | { type: 'oauth'; token: string; secret: string };
+  | { type: 'oauth'; token: string; secret: string }
+  | { type: 'local' };
+
+export function isLocalCredentials(
+  cred: DiscogsCredentials | null | undefined
+): cred is { type: 'local' } {
+  return cred?.type === 'local';
+}
 
 const isWeb = Platform.OS === 'web';
 
@@ -54,6 +61,9 @@ function parseCredentials(json: string | null): DiscogsCredentials | null {
     const parsed = JSON.parse(json) as unknown;
     if (!parsed || typeof parsed !== 'object') return null;
     const obj = parsed as Record<string, unknown>;
+    if (obj.type === 'local') {
+      return { type: 'local' };
+    }
     if (obj.type === 'pat' && typeof obj.token === 'string' && obj.token.trim()) {
       return { type: 'pat', token: obj.token.trim() };
     }
@@ -162,7 +172,7 @@ export async function clearAllAuth(): Promise<void> {
 /** @deprecated Use getStoredCredentials instead. Returns token for PAT; for OAuth returns null (use getStoredCredentials). */
 export async function getStoredToken(): Promise<string | null> {
   const cred = await getStoredCredentials();
-  if (!cred) return null;
+  if (!cred || cred.type === 'local') return null;
   return cred.token;
 }
 

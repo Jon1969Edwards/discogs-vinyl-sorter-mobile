@@ -36,6 +36,7 @@ import {
   exportAndShare,
   type ExportFormat,
 } from '../services';
+import { subscribeLocalCollection } from '../services/localCollection';
 import {
   setManualOrder,
   clearManualOrder,
@@ -160,6 +161,17 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
     getStoredCredentials().then(setCredentials);
   }, []);
 
+  useEffect(
+    () =>
+      subscribeLocalCollection(() => {
+        void getStoredCredentials().then((cred) => {
+          setCredentials(cred);
+          if (cred) void fetchCollection(cred);
+        });
+      }),
+    [fetchCollection]
+  );
+
   useEffect(() => subscribeGenreOverrides(() => {
     void applyGenreEdits();
   }), [applyGenreEdits]);
@@ -218,7 +230,10 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
 
   useCollectionWatch(
     onDiscogsCountChanged,
-    !!credentials && state.status === 'success' && !reorderMode
+    !!credentials &&
+      credentials.type !== 'local' &&
+      state.status === 'success' &&
+      !reorderMode
   );
 
   const handleSignOut = useCallback(async () => {
@@ -523,7 +538,11 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
           refreshControl={refreshControl}
           ListEmptyComponent={
             <Text style={styles.empty}>
-              {search ? 'No matches' : 'No LPs in collection'}
+              {search
+                ? 'No matches'
+                : credentials?.type === 'local'
+                  ? 'No albums yet. Import a CSV or JSON file in Settings, or paste one on the sign-in screen.'
+                  : 'No LPs in collection'}
             </Text>
           }
         />
@@ -542,7 +561,11 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
           refreshControl={refreshControl}
           ListEmptyComponent={
             <Text style={styles.empty}>
-              {search ? 'No matches' : 'No LPs in collection'}
+              {search
+                ? 'No matches'
+                : credentials?.type === 'local'
+                  ? 'No albums yet. Import a CSV or JSON file in Settings, or paste one on the sign-in screen.'
+                  : 'No LPs in collection'}
             </Text>
           }
         />

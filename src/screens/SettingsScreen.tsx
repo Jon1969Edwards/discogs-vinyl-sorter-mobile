@@ -15,6 +15,9 @@ import type { DividerMode, SortBy } from '../types';
 import { FORMAT_FILTERS } from '../domain/formatFilter';
 import { CurrencyPicker } from '../components/CurrencyPicker';
 import { clearAllAuth } from '../services';
+import {
+  pickAndImportCollection,
+} from '../services/importCollection';
 import type { DiscogsCurrency } from '../types';
 import { AppText } from '../components/ui/AppText';
 import { SettingsSection } from '../components/ui/SettingsSection';
@@ -62,6 +65,8 @@ export function SettingsScreen({
   const [saving, setSaving] = useState(false);
   const [licenseOpen, setLicenseOpen] = useState(false);
   const [upsellFeature, setUpsellFeature] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importNote, setImportNote] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (loaded) setCurrencyDraft(settings.currency);
@@ -100,6 +105,27 @@ export function SettingsScreen({
     await clearAllAuth();
     onSignOut();
   }, [onSignOut]);
+
+  const handleImportCollection = useCallback(async () => {
+    setImporting(true);
+    setImportNote(null);
+    try {
+      const count = await pickAndImportCollection();
+      if (count == null) return;
+      setImportNote(`Imported ${count} album${count === 1 ? '' : 's'}.`);
+      onSettingsChanged?.();
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : 'Could not import that file';
+      setImportNote(
+        msg.includes('ExpoDocumentPicker') || msg.includes('native module')
+          ? 'File picker is not in this install. Sign out and use Paste CSV / JSON on the sign-in screen.'
+          : msg
+      );
+    } finally {
+      setImporting(false);
+    }
+  }, [onSettingsChanged]);
 
   const currencyDirty = currencyDraft !== settings.currency;
 
@@ -383,6 +409,28 @@ export function SettingsScreen({
         </SettingsSection>
 
         <SettingsSection title="Account">
+          <AppText variant="caption" style={styles.aboutCaption}>
+            Import a CSV or JSON file to sort a collection without Discogs.
+            Spindle exports work as-is.
+          </AppText>
+          <TouchableOpacity
+            style={styles.proBtnSecondary}
+            onPress={() => void handleImportCollection()}
+            disabled={importing}
+          >
+            {importing ? (
+              <ActivityIndicator size="small" color={colors.textPrimary} />
+            ) : (
+              <AppText style={styles.proBtnTextSecondary}>
+                Import CSV or JSON
+              </AppText>
+            )}
+          </TouchableOpacity>
+          {importNote ? (
+            <AppText variant="caption" style={styles.aboutCaption}>
+              {importNote}
+            </AppText>
+          ) : null}
           <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut}>
             <AppText style={styles.signOutText}>Sign Out</AppText>
           </TouchableOpacity>
@@ -512,6 +560,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderRadius: radius.sm,
     alignItems: 'center',
+    marginTop: spacing.md,
   },
   signOutText: { color: colors.white, fontWeight: '700', fontSize: 16 },
 });

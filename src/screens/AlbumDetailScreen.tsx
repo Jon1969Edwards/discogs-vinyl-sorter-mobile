@@ -117,7 +117,7 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
 
         try {
           const credentials = await getStoredCredentials();
-          if (!credentials || cancelled) return;
+          if (!credentials || credentials.type === 'local' || cancelled) return;
           const client = createDiscogsClient(credentials);
           const stats = await fetchMarketplaceStats(
             client,
@@ -174,7 +174,7 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
         void (async () => {
           try {
             const cred = await getStoredCredentials();
-            if (!cred) return;
+            if (!cred || cred.type === 'local') return;
             const client = createDiscogsClient(cred);
             const username =
               (await getCacheUsername()) || (await getIdentity(client)).username;
@@ -201,7 +201,7 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
     void (async () => {
       try {
         const cred = await getStoredCredentials();
-        if (!cred) return;
+        if (!cred || cred.type === 'local') return;
         const client = createDiscogsClient(cred);
         const username =
           (await getCacheUsername()) || (await getIdentity(client)).username;

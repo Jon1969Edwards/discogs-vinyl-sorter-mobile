@@ -38,6 +38,7 @@ export interface ReleaseRow {
   thumb_url: string;
   cover_image_url: string;
   item_id?: string;
+  source?: string;
   genre?: string;
   genres?: string[];
   styles?: string[];
@@ -88,6 +89,10 @@ export const DISCOGS_CURRENCY_OPTIONS: { code: DiscogsCurrency; label: string }[
   ];
 
 /** Windows Auto-Sort GUI build_service._collect_rows defaults */
+export const SOURCE_LOCAL = 'local';
+export const SOURCE_DISCOGS = 'discogs';
+export const LOCAL_USERNAME = 'Imported';
+
 export const GUI_BUILD_SORT = {
   lastNameFirst: true,
   lnfAllow3: false,

@@ -1,5 +1,5 @@
 /**
- * Auth screen – Sign in with Discogs (OAuth) or enter Personal Access Token.
+ * Auth screen – Discogs OAuth/PAT, or import a CSV/JSON collection.
  */
 
 import React, { useState, useCallback } from 'react';
@@ -25,6 +25,11 @@ import {
   setStoredToken,
   getStoredCredentials,
 } from '../services';
+import {
+  applyImportedCollection,
+  pickAndImportCollection,
+  startLocalSession,
+} from '../services/importCollection';
 import { runOAuthFlow } from '../services/oauthDiscogs';
 import { Screen } from '../components/ui/Screen';
 import { AppText } from '../components/ui/AppText';
@@ -47,6 +52,9 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [checkingStored, setCheckingStored] = useState(true);
   const [showManualEntry, setShowManualEntry] = useState(false);
+  const [showPasteImport, setShowPasteImport] = useState(false);
+  const [pasteText, setPasteText] = useState('');
+  const [importLoading, setImportLoading] = useState(false);
 
   React.useEffect(() => {
     getStoredCredentials().then((cred) => {
@@ -125,6 +133,62 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     Linking.openURL(DISCOGS_TOKEN_URL);
   }, []);
 
+  const handleImportFile = useCallback(async () => {
+    setImportLoading(true);
+    setError(null);
+    try {
+      const count = await pickAndImportCollection();
+      if (count == null) return;
+      onAuthenticated();
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : 'Could not import that file';
+      setError(
+        msg.includes('ExpoDocumentPicker') || msg.includes('native module')
+          ? 'File picker needs a rebuilt app. Paste CSV or JSON below instead.'
+          : msg
+      );
+      setShowPasteImport(true);
+    } finally {
+      setImportLoading(false);
+    }
+  }, [onAuthenticated]);
+
+  const handlePasteImport = useCallback(async () => {
+    const text = pasteText.trim();
+    if (!text) {
+      setError('Paste a CSV or JSON collection first.');
+      return;
+    }
+    setImportLoading(true);
+    setError(null);
+    try {
+      const looksJson = text.startsWith('{') || text.startsWith('[');
+      await applyImportedCollection(
+        text,
+        looksJson ? 'pasted.json' : 'pasted.csv'
+      );
+      onAuthenticated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not import that text');
+    } finally {
+      setImportLoading(false);
+    }
+  }, [pasteText, onAuthenticated]);
+
+  const handleSkipDiscogs = useCallback(async () => {
+    setImportLoading(true);
+    setError(null);
+    try {
+      await startLocalSession();
+      onAuthenticated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not start without Discogs');
+    } finally {
+      setImportLoading(false);
+    }
+  }, [onAuthenticated]);
+
   if (checkingStored) {
     return (
       <Screen style={styles.center}>
@@ -133,7 +197,7 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
     );
   }
 
-  const anyLoading = oauthLoading || loading;
+  const anyLoading = oauthLoading || loading || importLoading;
 
   return (
     <Screen edges={[]}>
@@ -151,10 +215,47 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
               {APP_NAME}
             </AppText>
             <AppText variant="body" style={styles.subtitle}>
-              Sign in with Discogs to load your collection.
+              Sign in with Discogs, or import a CSV/JSON collection.
             </AppText>
 
-            {!showManualEntry ? (
+            {showPasteImport ? (
+              <>
+                <AppText variant="caption" style={styles.hint}>
+                  Paste a Spindle CSV/JSON export, or a spreadsheet with Artist
+                  and/or Title columns.
+                </AppText>
+                <TextInput
+                  style={[styles.input, styles.pasteArea]}
+                  placeholder={'Artist,Title\nThe Beatles,Abbey Road'}
+                  placeholderTextColor={colors.textMuted}
+                  value={pasteText}
+                  onChangeText={(v) => {
+                    setPasteText(v);
+                    setError(null);
+                  }}
+                  multiline
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!anyLoading}
+                />
+                <Button
+                  title="Import pasted collection"
+                  variant="secondary"
+                  onPress={() => void handlePasteImport()}
+                  loading={importLoading}
+                  disabled={anyLoading}
+                />
+                <TouchableOpacity
+                  style={styles.backLink}
+                  onPress={() => setShowPasteImport(false)}
+                  disabled={anyLoading}
+                >
+                  <AppText variant="accent" style={styles.linkText}>
+                    ← Back
+                  </AppText>
+                </TouchableOpacity>
+              </>
+            ) : !showManualEntry ? (
               <>
                 <Button
                   title="Sign in with Discogs"
@@ -171,6 +272,38 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                 >
                   <AppText variant="accent" style={styles.linkText}>
                     Or enter a Personal Access Token
+                  </AppText>
+                </TouchableOpacity>
+
+                <Button
+                  title="Import CSV or JSON"
+                  variant="secondary"
+                  onPress={() => void handleImportFile()}
+                  loading={importLoading && !showPasteImport}
+                  disabled={anyLoading}
+                  style={styles.importBtn}
+                />
+
+                <TouchableOpacity
+                  style={styles.linkButton}
+                  onPress={() => {
+                    setShowPasteImport(true);
+                    setError(null);
+                  }}
+                  disabled={anyLoading}
+                >
+                  <AppText variant="accent" style={styles.linkText}>
+                    Or paste CSV / JSON
+                  </AppText>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.linkButton}
+                  onPress={() => void handleSkipDiscogs()}
+                  disabled={anyLoading}
+                >
+                  <AppText variant="caption" style={styles.linkText}>
+                    Continue without Discogs
                   </AppText>
                 </TouchableOpacity>
               </>
@@ -285,6 +418,16 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     alignSelf: 'stretch',
+    marginBottom: spacing.lg,
+  },
+  importBtn: {
+    alignSelf: 'stretch',
+    marginBottom: spacing.sm,
+  },
+  pasteArea: {
+    alignSelf: 'stretch',
+    minHeight: 160,
+    textAlignVertical: 'top',
     marginBottom: spacing.lg,
   },
   linkButton: {

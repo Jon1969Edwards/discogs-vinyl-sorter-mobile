@@ -26,7 +26,7 @@ export function useCollectionWatch(
   const checkCount = useCallback(async () => {
     try {
       const credentials = await getStoredCredentials();
-      if (!credentials) return;
+      if (!credentials || credentials.type === 'local') return;
 
       const client = createDiscogsClient(credentials);
       const identity = await getIdentity(client);

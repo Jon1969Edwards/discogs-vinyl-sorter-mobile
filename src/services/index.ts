@@ -23,6 +23,7 @@ export {
   clearStoredToken,
   hasStoredToken,
   clearAllAuth,
+  isLocalCredentials,
   type DiscogsCredentials,
 } from './auth';
 

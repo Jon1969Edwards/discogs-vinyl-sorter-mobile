@@ -13,10 +13,13 @@ import {
   attachPricesToRows,
   type DiscogsCollectionRelease,
 } from '../services/discogsApi';
+import { LOCAL_USERNAME } from '../types';
 import {
   getStoredCredentials,
+  isLocalCredentials,
   type DiscogsCredentials,
 } from '../services/auth';
+import { loadLocalCollection } from '../services/localCollection';
 import {
   collectAllRows,
   sortRows,
@@ -77,6 +80,48 @@ export function useCollection() {
           credentialsOverride ?? (await getStoredCredentials());
         if (!credentials) {
           setState({ status: 'error', error: 'Not signed in' });
+          return;
+        }
+
+        const loadImportedCollection = async () => {
+          setState({
+            status: 'loading',
+            message: 'Loading imported collection…',
+          });
+          const settings = await loadSettings();
+          const pro = await refreshProStatus();
+          const allRows = (await loadLocalCollection()) ?? [];
+          await setCacheUsername(LOCAL_USERNAME);
+          await setManualOrderUsername(LOCAL_USERNAME);
+          const formatSet = formatsToSet(settings.formats);
+          let processed = filterRowsByFormat(allRows, formatSet);
+          processed = await applyGenreOverrides(processed);
+          const { rows: limited, truncated } = applyRecordLimit(
+            processed,
+            pro
+          );
+          processed = limited;
+          processed = sortRows(
+            processed,
+            GUI_BUILD_SORT.variousPolicy,
+            settings.sort_by as SortBy
+          );
+          processed = await applyManualOrder(processed);
+          await markFullFetch(LOCAL_USERNAME, allRows.length);
+          await saveCachedRows(LOCAL_USERNAME, processed);
+          setState({
+            status: 'success',
+            rows: processed,
+            username: LOCAL_USERNAME,
+            itemCount: allRows.length,
+            stale: false,
+            lastSyncedAt: Date.now(),
+            truncated,
+          });
+        };
+
+        if (isLocalCredentials(credentials)) {
+          await loadImportedCollection();
           return;
         }
 
@@ -287,6 +332,7 @@ export function useCollection() {
       const settings = await loadSettings();
       const pro = await refreshProStatus();
       const needPrices =
+        credentials.type !== 'local' &&
         (settings.show_prices ||
           settings.sort_by === 'price_asc' ||
           settings.sort_by === 'price_desc') &&

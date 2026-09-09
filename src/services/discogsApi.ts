@@ -111,6 +111,10 @@ export function createDiscogsClient(
       ? { type: 'pat', token: credentialsOrToken }
       : credentialsOrToken;
 
+  if (cred.type === 'local') {
+    throw new Error('Imported collections are not connected to Discogs.');
+  }
+
   const client = axios.create({
     baseURL: API_BASE,
     timeout: 30000,
@@ -122,7 +126,7 @@ export function createDiscogsClient(
 
   if (cred.type === 'pat') {
     client.defaults.headers.common['Authorization'] = `Discogs token=${cred.token}`;
-  } else {
+  } else if (cred.type === 'oauth') {
     // OAuth 1.0a: sign each request
     if (!DISCOGS_CONSUMER_KEY || !DISCOGS_CONSUMER_SECRET) {
       throw new Error(
