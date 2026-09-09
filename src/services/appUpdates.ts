@@ -15,6 +15,15 @@ export function otaUpdatesAvailable(): boolean {
 
 export type OtaCheckResult = 'unavailable' | 'none' | 'later' | 'reloaded' | 'error';
 
+function restartWithDownloadedUpdate(): Promise<void> {
+  // Android dismisses Alert before reload; calling reload in onPress often no-ops.
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      void Updates.reloadAsync().then(resolve).catch(reject);
+    }, 400);
+  });
+}
+
 export async function promptIfOtaUpdate(options?: {
   force?: boolean;
   silentIfNone?: boolean;
@@ -59,11 +68,19 @@ export async function promptIfOtaUpdate(options?: {
           {
             text: 'Restart',
             onPress: () => {
-              void Updates.reloadAsync();
-              resolve('reloaded');
+              void restartWithDownloadedUpdate()
+                .then(() => resolve('reloaded'))
+                .catch((err: unknown) => {
+                  Alert.alert(
+                    'Could not restart',
+                    `${err instanceof Error ? err.message : 'Unknown error'}\n\nFully close Spindle (swipe it away) and open it again.`
+                  );
+                  resolve('error');
+                });
             },
           },
-        ]
+        ],
+        { cancelable: false }
       );
     });
   } catch (err) {

@@ -1,8 +1,9 @@
 /**
  * Pick or apply a CSV/JSON collection file (no Discogs).
+ * expo-document-picker is loaded only when picking a file so older
+ * preview APKs can still apply OTA JS (paste import) without that native module.
  */
 
-import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import {
   CollectionImportError,
@@ -30,6 +31,14 @@ export async function startLocalSession(): Promise<void> {
 }
 
 export async function pickAndImportCollection(): Promise<number | null> {
+  let DocumentPicker: typeof import('expo-document-picker');
+  try {
+    DocumentPicker = await import('expo-document-picker');
+  } catch {
+    throw new CollectionImportError(
+      'File picker is not in this install. Paste CSV or JSON on the sign-in screen instead.'
+    );
+  }
   const result = await DocumentPicker.getDocumentAsync({
     type: [
       'text/csv',
