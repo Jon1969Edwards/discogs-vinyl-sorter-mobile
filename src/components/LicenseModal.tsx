@@ -100,16 +100,22 @@ export function LicenseModal({ visible, onClose }: Props) {
           ) : (
             <>
               <AppText variant="bodySmall" style={styles.hint}>
-                Already have a key? Paste it below (starts with VSS1-).
+                Already have a key? Paste the full key below (must start with
+                VSS1-).
               </AppText>
               <TextInput
-                style={styles.input}
+                style={[styles.input, styles.inputMulti]}
                 value={key}
-                onChangeText={setKey}
+                onChangeText={(t) => {
+                  setKey(t);
+                  setError(null);
+                }}
                 placeholder="VSS1-…"
                 placeholderTextColor={colors.textMuted}
                 autoCapitalize="none"
                 autoCorrect={false}
+                multiline
+                importantForAutofill="no"
               />
               {error ? (
                 <AppText variant="caption" style={styles.error}>
@@ -118,20 +124,39 @@ export function LicenseModal({ visible, onClose }: Props) {
               ) : null}
               <View style={styles.row}>
                 <Button
+                  title="Paste"
+                  variant="secondary"
+                  onPress={() => {
+                    void (async () => {
+                      try {
+                        const Clipboard = await import('expo-clipboard');
+                        const text = (await Clipboard.getStringAsync())?.trim();
+                        if (text) {
+                          setKey(text);
+                          setError(null);
+                        }
+                      } catch {
+                        setError('Could not read clipboard');
+                      }
+                    })();
+                  }}
+                  style={styles.flexBtn}
+                />
+                <Button
                   title="Activate"
                   onPress={() => void handleActivate()}
                   loading={busy}
                   disabled={!key.trim() || busy}
                   style={styles.flexBtn}
                 />
-                {purchaseStoreReady() ? (
-                  <Button
-                    title="Buy Pro"
-                    onPress={() => void Linking.openURL(PURCHASE_URL)}
-                    style={styles.flexBtn}
-                  />
-                ) : null}
               </View>
+              {purchaseStoreReady() ? (
+                <Button
+                  title="Buy Pro"
+                  onPress={() => void Linking.openURL(PURCHASE_URL)}
+                  style={{ marginTop: spacing.sm }}
+                />
+              ) : null}
               {!purchaseStoreReady() ? (
                 <AppText variant="caption" style={styles.soon}>
                   Purchase coming soon — paste a beta key if you have one.
@@ -175,6 +200,10 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     color: colors.textPrimary,
     marginBottom: spacing.sm,
+  },
+  inputMulti: {
+    minHeight: 88,
+    textAlignVertical: 'top',
   },
   error: { color: colors.accent, marginBottom: spacing.sm },
   row: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },

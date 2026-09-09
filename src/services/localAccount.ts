@@ -4,8 +4,14 @@
 
 import { Platform } from 'react-native';
 import CryptoJS from 'crypto-js';
+import * as ExpoCrypto from 'expo-crypto';
 import { startLocalSession } from './importCollection';
 import type { DiscogsCredentials } from './auth';
+
+async function randomSaltHex(byteCount = 16): Promise<string> {
+  const bytes = await ExpoCrypto.getRandomBytesAsync(byteCount);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
 
 const ACCOUNT_KEY = 'spindle_local_account';
 const isWeb = Platform.OS === 'web';
@@ -121,7 +127,7 @@ export async function createLocalAccount(input: {
       'A Spindle account already exists on this phone. Sign in instead.'
     );
   }
-  const salt = CryptoJS.lib.WordArray.random(16).toString(CryptoJS.enc.Hex);
+  const salt = await randomSaltHex(16);
   const record: StoredLocalAccount = {
     version: 1,
     name: input.name.trim(),

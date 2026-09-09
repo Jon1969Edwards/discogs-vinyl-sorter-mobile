@@ -258,7 +258,14 @@ export async function getStoredLicense(): Promise<StoredLicense | null> {
 export async function activateLicense(
   key: string
 ): Promise<{ ok: boolean; message: string }> {
-  const payload = parseKey(key);
+  const trimmed = key.trim().replace(/\s+/g, '');
+  if (!trimmed.startsWith(`${LICENSE_PREFIX}-`)) {
+    return {
+      ok: false,
+      message: `Paste the full key starting with ${LICENSE_PREFIX}- (not just the ending).`,
+    };
+  }
+  const payload = parseKey(trimmed);
   if (!payload) {
     return { ok: false, message: 'Invalid or expired license key.' };
   }
@@ -267,7 +274,7 @@ export async function activateLicense(
     tier: payload.tier || 'pro',
     email: payload.email || '',
     exp: payload.exp || 0,
-    key_hint: keyHint(key),
+    key_hint: keyHint(trimmed),
   };
   await saveStoredLicense(lic);
   _proCache = true;

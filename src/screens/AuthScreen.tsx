@@ -264,6 +264,9 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                   value={localName}
                   onChangeText={setLocalName}
                   autoCapitalize="words"
+                  autoComplete="off"
+                  textContentType="none"
+                  importantForAutofill="no"
                   editable={!anyLoading}
                 />
                 <TextInput
@@ -274,6 +277,9 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                   onChangeText={setLocalEmail}
                   autoCapitalize="none"
                   keyboardType="email-address"
+                  autoComplete="off"
+                  textContentType="none"
+                  importantForAutofill="no"
                   editable={!anyLoading}
                 />
                 <TextInput
@@ -283,6 +289,9 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                   value={localPassword}
                   onChangeText={setLocalPassword}
                   secureTextEntry
+                  autoComplete="off"
+                  textContentType="none"
+                  importantForAutofill="no"
                   editable={!anyLoading}
                 />
                 <TextInput
@@ -292,6 +301,9 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                   value={localConfirm}
                   onChangeText={setLocalConfirm}
                   secureTextEntry
+                  autoComplete="off"
+                  textContentType="none"
+                  importantForAutofill="no"
                   editable={!anyLoading}
                 />
                 <Button
@@ -324,6 +336,9 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                   onChangeText={setLocalEmail}
                   autoCapitalize="none"
                   keyboardType="email-address"
+                  autoComplete="off"
+                  textContentType="none"
+                  importantForAutofill="no"
                   editable={!anyLoading}
                 />
                 <TextInput
@@ -333,6 +348,9 @@ export function AuthScreen({ onAuthenticated }: AuthScreenProps) {
                   value={localPassword}
                   onChangeText={setLocalPassword}
                   secureTextEntry
+                  autoComplete="off"
+                  textContentType="none"
+                  importantForAutofill="no"
                   editable={!anyLoading}
                 />
                 <Button
@@ -606,6 +624,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     fontSize: 16,
     color: colors.textPrimary,
+    underlineColorAndroid: 'transparent',
   },
   inputFlex: {
     flex: 1,
