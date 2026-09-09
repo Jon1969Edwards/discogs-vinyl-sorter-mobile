@@ -23,9 +23,7 @@
       "package": "com.discogvinylsorter.app"
     },
     "scheme": "discogvinylsorter",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/364685dc-2aaf-4d83-a5e8-bf3ecca04128",
       "enabled": true,

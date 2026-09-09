@@ -36,6 +36,8 @@ Day-to-day TypeScript changes do **not** need a new APK. After this `preview` AP
 
 Native changes (new Expo modules, `app.json` plugins, icons, OAuth secrets baked into the binary) still need `npm run build:preview` and a reinstall.
 
+This repo has a native `android/` folder (bare workflow). `runtimeVersion` in `app.json` must be a string such as `"1.0.0"`, not `{ "policy": "appVersion" }`. Keep that string in sync with `version` when you ship a new native APK.
+
 **One-time setup**
 
 1. Create an Expo access token: [expo.dev/settings/access-tokens](https://expo.dev/settings/access-tokens).
@@ -91,7 +93,7 @@ Increment `version` in [app.json](../app.json) before each store submission. Pro
 |-------|--------|
 | Profile | `preview` (APK) |
 | Build ID | `262046a3-5131-46b1-94f2-04b7e86ae9a4` |
-| Dashboard | https://expo.dev/accounts/bovverskin1969/projects/discogs-vinyl-sorter/builds/262046a3-5131-46b1-94f2-04b7e86ae9a4 |
+| Dashboard | https://expo.dev/accounts/bovverskin1969/projects/discogs-vinyl-sorter |
 
 After the build finishes, download the APK from the dashboard and run [SMOKE_TEST_CHECKLIST.md](./SMOKE_TEST_CHECKLIST.md) **without Metro**.
 

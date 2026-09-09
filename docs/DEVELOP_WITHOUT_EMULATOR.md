@@ -84,12 +84,13 @@ eas whoami
 
 ### 1b. Permission denied on build?
 
-If you see `Entity not authorized` for project id `1658702c-...`, the repo is linked to **`jonathan-charles-edwards`** but you are logged in as someone else.
+If you see `Entity not authorized` for project id `1658702c-...`, that ID belongs to the **`jonathan-charles-edwards`** Expo account. The CLI login `bovverskin1969` cannot read it.
 
 Pick one:
 
-- **Same person, wrong login:** `eas logout` → `eas login` with the account that owns that Expo project.
-- **Your own Expo account (typical):** re-link the app (once):
+- **Build as `bovverskin1969` (usual):** keep `owner` and `projectId` as `bovverskin1969` / `364685dc-…` in `app.json`.
+- **Use the Jonathan org:** `eas logout` → `eas login` as that account, or add `bovverskin1969` as an org member with Developer access, then set `projectId` from Project → Details.
+- **A different Expo account:** re-link the app (once):
 
 ```powershell
 cd F:\Dev\discogs-vinyl-sorter-mobile
