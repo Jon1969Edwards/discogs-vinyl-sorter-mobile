@@ -65,4 +65,28 @@ describe('export dividers parity', () => {
     expect(lines[2]).toBe('=== I ===');
     expect(lines[4]).toBe('=== Q ===');
   });
+
+  it('genre section headers when sortBy is genre', () => {
+    const jazz = mockRow('Miles Davis', 'davis, miles');
+    jazz.genre = 'Jazz';
+    jazz.genres = ['Jazz'];
+    const rock = mockRow('The Beatles', 'beatles');
+    rock.genre = 'Rock';
+    rock.genres = ['Rock'];
+    const unknown = mockRow('Mystery', 'mystery');
+    unknown.genre = '';
+    unknown.genres = [];
+    const lines = generateTxtLines([jazz, rock, unknown], {
+      dividerMode: 'abc',
+      sortBy: 'genre',
+    });
+    expect(lines[0]).toBe('=== Jazz ===');
+    expect(lines[1]).toContain('Miles Davis');
+    expect(lines[2]).toBe('=== Rock ===');
+    expect(lines[3]).toContain('The Beatles');
+    expect(lines[4]).toBe('=== Unknown ===');
+    expect(lines[5]).toContain('Mystery');
+    expect(resolveDividerMode(true, 'letter', 'genre')).toBe('genre');
+    expect(resolveDividerMode(false, null)).toBe('none');
+  });
 });

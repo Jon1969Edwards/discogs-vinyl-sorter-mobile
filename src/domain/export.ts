@@ -2,7 +2,8 @@
  * Export TXT, CSV, JSON – port of Windows core/export.py
  */
 
-import type { DividerMode, ReleaseRow } from '../types';
+import type { DividerMode, ReleaseRow, SortBy } from '../types';
+import { genreLabel } from './genre';
 
 export type { DividerMode };
 
@@ -14,9 +15,16 @@ const SHELF_DIVIDER_TITLES: Record<string, string> = {
 
 export function resolveDividerMode(
   dividers = false,
-  dividerMode?: string | null
+  dividerMode?: string | null,
+  sortBy?: SortBy | string | null
 ): DividerMode {
-  if (dividerMode === 'none' || dividerMode === 'letter' || dividerMode === 'abc') {
+  if ((sortBy || '') === 'genre') return 'genre';
+  if (
+    dividerMode === 'none' ||
+    dividerMode === 'letter' ||
+    dividerMode === 'abc' ||
+    dividerMode === 'genre'
+  ) {
     return dividerMode;
   }
   return dividers ? 'letter' : 'none';
@@ -46,6 +54,11 @@ function getDividerLine(
   if (mode === 'letter') {
     const first = sortLetterFromRow(r);
     if (current !== first) return { next: first, line: `=== ${first} ===` };
+    return { next: current, line: null };
+  }
+  if (mode === 'genre') {
+    const genre = genreLabel(r);
+    if (current !== genre) return { next: genre, line: `=== ${genre} ===` };
     return { next: current, line: null };
   }
   const letter = sortLetterFromRow(r);
@@ -95,13 +108,14 @@ export interface GenerateTxtOptions {
   dividerMode?: string | null;
   showPrice?: boolean;
   showCountry?: boolean;
+  sortBy?: SortBy | string | null;
 }
 
 export function generateTxtLines(
   rows: ReleaseRow[],
   options: GenerateTxtOptions = {}
 ): string[] {
-  const mode = resolveDividerMode(options.dividers, options.dividerMode);
+  const mode = resolveDividerMode(options.dividers, options.dividerMode, options.sortBy);
   const lines: string[] = [];
   let currentDiv: string | null = null;
 
@@ -127,6 +141,7 @@ export function generateCsv(rows: ReleaseRow[]): string {
     'CatNo',
     'Country',
     'Format',
+    'Genre',
     'DiscogsURL',
     'Notes',
   ];
@@ -149,6 +164,7 @@ export function generateCsv(rows: ReleaseRow[]): string {
       r.catno,
       r.country,
       r.format_str,
+      (r.genres && r.genres.length > 0 ? r.genres.join('; ') : r.genre) || '',
       r.discogs_url,
       r.notes,
     ]
@@ -172,6 +188,9 @@ export function generateJson(rows: ReleaseRow[]): string {
     notes: r.notes,
     sort_artist: r.sort_artist,
     sort_title: r.sort_title,
+    genre: genreLabel(r),
+    genres: r.genres || [],
+    styles: r.styles || [],
   }));
   return JSON.stringify(data, null, 2);
 }

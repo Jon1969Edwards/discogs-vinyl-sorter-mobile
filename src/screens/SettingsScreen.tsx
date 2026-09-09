@@ -43,6 +43,7 @@ const SORT_OPTIONS: { id: SortBy; label: string }[] = [
   { id: 'artist', label: 'Artist' },
   { id: 'title', label: 'Title' },
   { id: 'year', label: 'Year' },
+  { id: 'genre', label: 'Genre' },
   { id: 'price_asc', label: 'Price (low first)' },
   { id: 'price_desc', label: 'Price (high first)' },
 ];

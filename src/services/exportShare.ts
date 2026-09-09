@@ -56,6 +56,7 @@ export async function exportAndShare(
       content = generateTxt(limited, {
         dividerMode,
         showPrice,
+        sortBy: settings.sort_by,
       });
       break;
     case 'csv':

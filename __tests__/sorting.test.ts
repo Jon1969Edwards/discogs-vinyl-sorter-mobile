@@ -1,4 +1,9 @@
 import { makeSortKeys, sortRows, isVariousArtist } from '../src/domain/sorting';
+import {
+  parseGenreList,
+  primaryGenre,
+  genresFromBasic,
+} from '../src/domain/genre';
 import type { ReleaseRow } from '../src/types';
 
 function sortKey(
@@ -103,5 +108,59 @@ describe('sorting parity with Windows test_sorting.py', () => {
     const sorted = sortRows([r1, r2], 'title', 'artist');
     expect(sorted[0].title).toBe('Alpha Tunes');
     expect(isVariousArtist('Various Artists')).toBe(true);
+  });
+
+  it('parses Discogs genres without splitting Funk / Soul', () => {
+    expect(parseGenreList('Folk, World, & Country')).toEqual(['Folk, World, & Country']);
+    expect(parseGenreList('Jazz; Funk / Soul')).toEqual(['Jazz', 'Funk / Soul']);
+    expect(parseGenreList(['Jazz', 'Jazz', 'Rock'])).toEqual(['Jazz', 'Rock']);
+    expect(genresFromBasic({ genres: ['Funk / Soul', 'Jazz'] })).toEqual([
+      'Funk / Soul',
+      'Jazz',
+    ]);
+    expect(primaryGenre(['Funk / Soul', 'Jazz'])).toBe('Funk / Soul');
+    expect(primaryGenre([])).toBe('Unknown');
+  });
+
+  it('sorts by genre with Unknown last', () => {
+    const row = (
+      artist: string,
+      title: string,
+      genre: string,
+      year = 1970
+    ): ReleaseRow => {
+      const [sort_artist, sort_title] = makeSortKeys(artist, title, {
+        lastNameFirst: false,
+        lnfSafeBands: true,
+      });
+      return {
+        artist_display: artist,
+        title,
+        year,
+        label: '',
+        catno: '',
+        country: '',
+        format_str: '',
+        discogs_url: '',
+        notes: '',
+        sort_artist,
+        sort_title,
+        thumb_url: '',
+        cover_image_url: '',
+        genre,
+        genres: genre ? [genre] : [],
+      };
+    };
+    const jazzZ = row('Zebra', 'Late Jazz', 'Jazz', 1980);
+    const jazzA = row('Alpha', 'Early Jazz', 'Jazz', 1960);
+    const rock = row('The Beatles', 'Abbey Road', 'Rock', 1969);
+    const unknown = row('Mystery', 'No Tags', '', 2000);
+    const sorted = sortRows([unknown, rock, jazzZ, jazzA], 'normal', 'genre');
+    expect(sorted.map((r) => r.title)).toEqual([
+      'Early Jazz',
+      'Late Jazz',
+      'Abbey Road',
+      'No Tags',
+    ]);
   });
 });

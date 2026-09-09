@@ -33,9 +33,20 @@ import { openDiscogsUrl } from '../utils/discogsLinking';
 import { openAlbumOnSpotify } from '../utils/spotify';
 import { rowToWishlistEntry } from '../utils/wishlistEntry';
 import { useCachedThumb } from '../services/thumbnailCache';
+import { GenreEditModal } from '../components/GenreEditModal';
 import { LicenseModal } from '../components/LicenseModal';
 import { ProUpgradeModal } from '../components/ProUpgradeModal';
 import { colors, radius, spacing } from '../theme';
+import {
+  genresDisplay,
+  stylesDisplay,
+} from '../domain/genre';
+import {
+  clearGenreOverride,
+  hasGenreOverride,
+  loadGenreOverrides,
+  setGenreOverride,
+} from '../services/genreOverrides';
 
 type AlbumDetailScreenProps = {
   route: { params: { release: ReleaseRow } };
@@ -51,6 +62,8 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
   const [inWishlist, setInWishlist] = useState(false);
   const [licenseOpen, setLicenseOpen] = useState(false);
   const [upsellOpen, setUpsellOpen] = useState(false);
+  const [genreEditOpen, setGenreEditOpen] = useState(false);
+  const [genreOverride, setGenreOverrideFlag] = useState(false);
 
   const coverUri = useCachedThumb(
     release.cover_image_url || release.thumb_url || undefined
@@ -59,6 +72,9 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
   useFocusEffect(
     useCallback(() => {
       const releaseId = route.params.release.release_id;
+      void loadGenreOverrides().then(() => {
+        setGenreOverrideFlag(hasGenreOverride(route.params.release));
+      });
       void loadLocalWishlist().then((list) => {
         setInWishlist(
           isInWishlist(
@@ -147,6 +163,25 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
     }
   }, [inWishlist, release]);
 
+  const saveGenre = useCallback(
+    async (text: string) => {
+      const next = await setGenreOverride(release, text);
+      if (next) {
+        setRelease(next);
+        setGenreOverrideFlag(true);
+      }
+      setGenreEditOpen(false);
+    },
+    [release]
+  );
+
+  const resetGenre = useCallback(async () => {
+    const next = await clearGenreOverride(release);
+    setRelease(next);
+    setGenreOverrideFlag(false);
+    setGenreEditOpen(false);
+  }, [release]);
+
   return (
     <View style={styles.wrapper}>
       <View style={styles.header}>
@@ -179,9 +214,17 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
         )}
 
         <View style={styles.section}>
+          <InfoRow label="Genre" value={genresDisplay(release)} />
+          <InfoRow label="Style" value={stylesDisplay(release) || '—'} />
           <InfoRow label="Format" value={release.format_str || '—'} />
           <InfoRow label="Label" value={release.label || '—'} />
           <InfoRow label="Catalog" value={release.catno || '—'} />
+          <TouchableOpacity
+            style={styles.editGenreBtn}
+            onPress={() => setGenreEditOpen(true)}
+          >
+            <Text style={styles.editGenreText}>Edit genre</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
@@ -255,6 +298,19 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
         </View>
       </ScrollView>
 
+      <GenreEditModal
+        visible={genreEditOpen}
+        albumLabel={`${release.artist_display} — ${release.title}`}
+        current={
+          release.genres && release.genres.length > 0
+            ? release.genres.join('; ')
+            : genresDisplay(release)
+        }
+        hasOverride={genreOverride}
+        onSave={(text) => void saveGenre(text)}
+        onReset={() => void resetGenre()}
+        onClose={() => setGenreEditOpen(false)}
+      />
       <ProUpgradeModal
         visible={upsellOpen}
         feature="Marketplace prices"
@@ -377,6 +433,19 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: 14,
     color: colors.textPrimary,
+    flexShrink: 1,
+    textAlign: 'right',
+    marginLeft: spacing.md,
+  },
+  editGenreBtn: {
+    marginTop: spacing.md,
+    alignSelf: 'flex-start',
+    paddingVertical: spacing.sm,
+  },
+  editGenreText: {
+    color: colors.accent,
+    fontSize: 16,
+    fontWeight: '600',
   },
   notes: {
     fontSize: 14,

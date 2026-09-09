@@ -11,7 +11,7 @@
 
 The mobile app is an **Expo SDK 54** port of the **Windows Auto-Sort GUI** collection pipeline: fetch all releases from Discogs, classify formats, filter by user-selected formats (default LP), sort with the same last-name-first / GUI build rules as Windows, optionally attach marketplace prices, apply manual order overrides, cache results, and export TXT/CSV/JSON with letter or ABC shelf dividers.
 
-**Phases A–D are implemented** in code and covered by **41 Jest tests** (domain golden tests plus cache, settings, price formatting, collection notes, licensing/gates). **Phase E (store/EAS polish)** is partially done — see `docs/EAS_RELEASE.md` and `docs/STORE_LISTING.md`.
+**Phases A–D are implemented** in code and covered by **47 Jest tests** (domain golden tests plus cache, settings, price formatting, collection notes, licensing/gates, genre overrides). **Phase E (store/EAS polish)** is partially done — see `docs/EAS_RELEASE.md` and `docs/STORE_LISTING.md`.
 
 **Post-parity mobile work:** Spindle branding; Free/Pro with shared `VSS1` keys; richer album detail (wishlist, Spotify, cached prices); durable exports under Documents; parallel marketplace price fetch + 7-day price cache; currency dropdown; collection header/search/pull-to-refresh.
 
@@ -90,8 +90,9 @@ flowchart TD
 ## Parity contract (behavioral)
 
 1. **Collection:** Fetch all folder-0 releases → tag `format_categories` → filter by saved `formats` (default `['lp']`) → sort with GUI build options (`lastNameFirst`, `lnfSafeBands`, `lnfAllow3=false`, `variousPolicy=normal` from `GUI_BUILD_SORT` in `src/types/index.ts`).
-2. **Export:** TXT / CSV / JSON aligned with Windows `core/export.py`; `divider_mode`: `none` | `letter` | `abc`.
-3. **Config** (AsyncStorage key `discogs_app_settings`): `formats`, `divider_mode`, `sort_by`, `currency`, `write_json`, `poll_seconds`, `show_prices`, `save_last_export`, `user_agent`, `per_page`.
+2. **Export:** TXT / CSV / JSON aligned with Windows `core/export.py`; `divider_mode`: `none` | `letter` | `abc`. When `sort_by` is `genre`, TXT uses `=== Jazz ===` section headers (letter/ABC ignored).
+3. **Config** (AsyncStorage key `discogs_app_settings`): `formats`, `divider_mode`, `sort_by` (`artist` | `title` | `year` | `genre` | `price_asc` | `price_desc`), `currency`, `write_json`, `poll_seconds`, `show_prices`, `save_last_export`, `user_agent`, `per_page`.
+3b. **Genre edits:** AsyncStorage `spindle_genre_overrides` (Windows `genre_overrides.json`). Album detail **Edit genre**; survives Discogs refresh.
 4. **Pro:** Free capped at 100 records; prices, manual order, and ABC dividers require Pro (`VSS1` key). Soft upsell modals.
 5. **Wishlist:** Local entries + sync from Discogs wantlist during collection build (best-effort).
 6. **Cache:** Full row cache per username; collection item count for stale detection; 7-day price TTL in cache service; last sync timestamp on stale banner.
@@ -104,9 +105,9 @@ flowchart TD
 
 | Windows | Mobile |
 |---------|--------|
-| `core/sorting.py` | `src/domain/sorting.ts` |
-| `core/format_filter.py` | `src/domain/formatFilter.ts` |
+| `core/sorting.py` | `src/domain/sorting.ts`, `src/domain/genre.ts` |
 | `core/export.py` | `src/domain/export.ts` |
+| `core/genre_overrides.py` | `src/services/genreOverrides.ts` |
 | `core/api.py` | `src/services/discogsApi.ts` |
 | `core/oauth_discogs.py` | `src/services/oauthDiscogs.ts` |
 | `core/build_service.py` (cache, count) | `src/services/collectionCache.ts`, `src/hooks/useCollection.ts` |
@@ -122,8 +123,8 @@ flowchart TD
 | `gui/license_dialog.py` | `src/components/LicenseModal.tsx` |
 | Export files | `src/services/exportShare.ts` (share + Documents/exports) |
 | `test_sorting.py` | `__tests__/sorting.test.ts` |
-| `test_format_filter.py` | `__tests__/formatFilter.test.ts` |
 | `test_export_dividers.py` | `__tests__/exportDividers.test.ts` |
+| `test_genre_overrides.py` | `__tests__/genreOverrides.test.ts` |
 | — | `__tests__/collectionCache.test.ts`, `settings.test.ts`, `formatPrice.test.ts`, `collectionNotes.test.ts`, `licensing.test.ts` |
 
 Windows sibling doc (optional): `discogs-vinyl-sorter-windows/docs/MOBILE_PARITY.md` → links here.

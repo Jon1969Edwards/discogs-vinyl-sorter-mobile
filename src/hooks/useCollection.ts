@@ -28,6 +28,9 @@ import {
   setManualOrderUsername,
 } from '../services/manualOrder';
 import {
+  applyGenreOverrides,
+} from '../services/genreOverrides';
+import {
   markFullFetch,
   setCacheUsername,
   saveCachedRows,
@@ -114,6 +117,7 @@ export function useCollection() {
 
         const formatSet = formatsToSet(settings.formats);
         let processed = filterRowsByFormat(allRows, formatSet);
+        processed = await applyGenreOverrides(processed);
 
         const { rows: limited, truncated } = applyRecordLimit(processed, pro);
         processed = limited;
@@ -241,9 +245,10 @@ export function useCollection() {
             cached.rows,
             pro
           );
+          const withGenres = await applyGenreOverrides(limited);
           setState({
             status: 'success',
-            rows: limited,
+            rows: withGenres,
             username: cached.username,
             stale: true,
             lastSyncedAt,
@@ -337,6 +342,30 @@ export function useCollection() {
     []
   );
 
+  const applyGenreEdits = useCallback(async () => {
+    const settings = await loadSettings();
+    setState((prev) => {
+      if (prev.status !== 'success') return prev;
+      const { rows, username } = prev;
+      void (async () => {
+        let processed = await applyGenreOverrides(rows);
+        processed = sortRows(
+          processed,
+          GUI_BUILD_SORT.variousPolicy,
+          settings.sort_by as SortBy
+        );
+        processed = await applyManualOrder(processed);
+        await saveCachedRows(username, processed);
+        setState((p) =>
+          p.status === 'success' && p.username === username
+            ? { ...p, rows: processed }
+            : p
+        );
+      })();
+      return prev;
+    });
+  }, []);
+
   const refreshCollection = useCallback(
     async (credentials: DiscogsCredentials) => {
       await fetchCollection(credentials);
@@ -349,6 +378,7 @@ export function useCollection() {
     fetchCollection,
     refreshCollection,
     repriceCollection,
+    applyGenreEdits,
     reset,
   };
 }

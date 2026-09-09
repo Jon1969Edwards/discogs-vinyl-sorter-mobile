@@ -7,6 +7,13 @@ import type { ReleaseRow, SortBy, VariousPolicy } from '../types';
 import { GUI_BUILD_SORT } from '../types';
 import { formatCollectionNotes } from '../utils/collectionNotes';
 import { filterRowsByFormat } from './formatFilter';
+import {
+  UNKNOWN_GENRE,
+  genreLabel,
+  genresFromBasic,
+  primaryGenre,
+  stylesFromBasic,
+} from './genre';
 
 export type { SortBy, VariousPolicy };
 
@@ -22,6 +29,8 @@ export interface DiscogsBasic {
   country?: string;
   thumb?: string;
   cover_image?: string;
+  genres?: string[];
+  styles?: string[];
   [key: string]: unknown;
 }
 
@@ -380,6 +389,10 @@ export function buildReleaseRow(
     lnfSafeBands: options.lnfSafeBands ?? GUI_BUILD_SORT.lnfSafeBands,
   };
   const [sortArtist, sortTitle] = makeSortKeys(artistDisplay, title, sortOpts);
+  const genres = genresFromBasic(basic);
+  const styles = stylesFromBasic(basic);
+  const genre = primaryGenre(genres);
+  const itemId = relId != null ? `discogs:${relId}` : '';
 
   return {
     artist_display: artistDisplay,
@@ -399,6 +412,12 @@ export function buildReleaseRow(
     format_categories: detectFormatCategories(basic),
     thumb_url: basic.thumb || '',
     cover_image_url: basic.cover_image || '',
+    item_id: itemId,
+    genre,
+    genres,
+    styles,
+    source_genre: genre,
+    source_genres: genres,
   };
 }
 
@@ -448,6 +467,21 @@ export function sortRows(
     });
   }
 
+  if (sortBy === 'genre') {
+    return [...rows].sort((a, b) => {
+      const la = genreLabel(a);
+      const lb = genreLabel(b);
+      const ua = la.toLowerCase() === UNKNOWN_GENRE.toLowerCase() ? 1 : 0;
+      const ub = lb.toLowerCase() === UNKNOWN_GENRE.toLowerCase() ? 1 : 0;
+      if (ua !== ub) return ua - ub;
+      const g = la.toLowerCase().localeCompare(lb.toLowerCase());
+      if (g !== 0) return g;
+      if (a.sort_artist !== b.sort_artist) return a.sort_artist.localeCompare(b.sort_artist);
+      if (a.sort_title !== b.sort_title) return a.sort_title.localeCompare(b.sort_title);
+      return (a.year ?? 9999) - (b.year ?? 9999);
+    });
+  }
+
   return [...rows].sort((a, b) => {
     const isVarA = isVariousArtist(a.artist_display);
     const isVarB = isVariousArtist(b.artist_display);
@@ -487,6 +521,9 @@ export function sortRows(
 }
 
 export function getSectionLetter(row: ReleaseRow, sortBy: SortBy): string {
+  if (sortBy === 'genre') {
+    return genreLabel(row);
+  }
   if (sortBy === 'artist' || sortBy === 'title') {
     const str = sortBy === 'artist' ? row.sort_artist : row.sort_title;
     const first = (str || '').charAt(0).toUpperCase();

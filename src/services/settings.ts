@@ -31,11 +31,13 @@ export async function loadSettings(): Promise<AppSettings> {
     const raw = await AsyncStorage.getItem(SETTINGS_KEY);
     if (!raw) return { ...DEFAULT_SETTINGS };
     const parsed = JSON.parse(raw) as Partial<AppSettings>;
+    const sortBy = parsed.sort_by;
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,
       formats: Array.isArray(parsed.formats) ? parsed.formats : DEFAULT_SETTINGS.formats,
       currency: normalizeDiscogsCurrency(parsed.currency),
+      sort_by: typeof sortBy === 'string' && isValidSortBy(sortBy) ? sortBy : DEFAULT_SETTINGS.sort_by,
       save_last_export:
         typeof parsed.save_last_export === 'boolean'
           ? parsed.save_last_export
@@ -73,6 +75,7 @@ export function isValidSortBy(v: string): v is SortBy {
     v === 'artist' ||
     v === 'title' ||
     v === 'year' ||
+    v === 'genre' ||
     v === 'price_asc' ||
     v === 'price_desc'
   );

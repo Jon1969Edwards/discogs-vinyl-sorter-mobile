@@ -34,6 +34,12 @@ export interface ReleaseRow {
   price_currency?: string;
   thumb_url: string;
   cover_image_url: string;
+  item_id?: string;
+  genre?: string;
+  genres?: string[];
+  styles?: string[];
+  source_genre?: string;
+  source_genres?: string[];
 }
 
 export interface BuildResult {
@@ -42,10 +48,10 @@ export interface BuildResult {
   lines: string[];
 }
 
-export type DividerMode = 'none' | 'letter' | 'abc';
+export type DividerMode = 'none' | 'letter' | 'abc' | 'genre';
 
 export type VariousPolicy = 'normal' | 'last' | 'title';
-export type SortBy = 'artist' | 'title' | 'year' | 'price_asc' | 'price_desc';
+export type SortBy = 'artist' | 'title' | 'year' | 'genre' | 'price_asc' | 'price_desc';
 
 /** Discogs marketplace `curr_abbr` values (API docs). */
 export type DiscogsCurrency =

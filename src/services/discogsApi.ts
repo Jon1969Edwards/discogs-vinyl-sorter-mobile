@@ -61,6 +61,8 @@ export interface DiscogsCollectionRelease {
     artists?: Array<{ name: string; join?: string }>;
     artist?: string;
     country?: string;
+    genres?: string[];
+    styles?: string[];
     resource_url: string;
   };
   notes?: string | Array<{ field_id: number; value: string }>;

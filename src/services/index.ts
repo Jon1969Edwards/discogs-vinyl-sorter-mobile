@@ -77,6 +77,14 @@ export {
   clearManualOrder,
 } from './manualOrder';
 
+export {
+  applyGenreOverrides,
+  setGenreOverride,
+  clearGenreOverride,
+  hasGenreOverride,
+  subscribeGenreOverrides,
+} from './genreOverrides';
+
 export { useCachedThumb, getCachedThumbUri } from './thumbnailCache';
 
 export {

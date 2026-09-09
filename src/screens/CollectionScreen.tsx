@@ -26,6 +26,7 @@ import { useCollectionWatch } from '../hooks/useCollectionWatch';
 import { useSettings } from '../context/SettingsContext';
 import { useLicense } from '../context/LicenseContext';
 import { sortRows, getSectionLetter } from '../utils';
+import { genreLabel } from '../domain/genre';
 import { formatListPrice } from '../utils/formatPrice';
 import { releaseRowKey } from '../utils/releaseRowKey';
 import { GUI_BUILD_SORT } from '../types';
@@ -40,6 +41,7 @@ import {
   clearManualOrder,
   manualOrderIsEnabled,
 } from '../services/manualOrder';
+import { subscribeGenreOverrides } from '../services/genreOverrides';
 import { canFetchPrices, canUseManualOrder, FREE_RECORD_LIMIT } from '../services/featureGate';
 import { LicenseModal } from '../components/LicenseModal';
 import { ProUpgradeModal } from '../components/ProUpgradeModal';
@@ -112,9 +114,15 @@ function AlbumRow({
         <Text style={styles.title} numberOfLines={1}>
           {item.title}
         </Text>
-        {(item.year != null || item.country) ? (
+        {(item.year != null || item.country || genreLabel(item) !== 'Unknown') ? (
           <Text style={styles.meta} numberOfLines={1}>
-            {[item.year, item.country].filter((v) => v != null && v !== '').join(' • ')}
+            {[
+              item.year,
+              item.country,
+              genreLabel(item) !== 'Unknown' ? genreLabel(item) : null,
+            ]
+              .filter((v) => v != null && v !== '')
+              .join(' • ')}
           </Text>
         ) : null}
         {priceLine ? (
@@ -130,7 +138,7 @@ function AlbumRow({
 export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProps) {
   const { settings, loaded } = useSettings();
   const { isPro } = useLicense();
-  const { state, fetchCollection, refreshCollection, repriceCollection, reset } =
+  const { state, fetchCollection, refreshCollection, repriceCollection, applyGenreEdits, reset } =
     useCollection();
   const [credentials, setCredentials] = useState<import('../services').DiscogsCredentials | null>(null);
   const [search, setSearch] = useState('');
@@ -145,12 +153,16 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
   const [upsellFeature, setUpsellFeature] = useState<string | null>(null);
 
   const settingsKey = `${settings.formats.join(',')}|${settings.sort_by}|${settings.show_prices}|${settings.currency}|${isPro}`;
-  const showDividers = settings.divider_mode !== 'none';
+  const showDividers = settings.divider_mode !== 'none' || settings.sort_by === 'genre';
   const showListPrices = settings.show_prices && canFetchPrices(isPro);
 
   useEffect(() => {
     getStoredCredentials().then(setCredentials);
   }, []);
+
+  useEffect(() => subscribeGenreOverrides(() => {
+    void applyGenreEdits();
+  }), [applyGenreEdits]);
 
   useEffect(() => {
     if (credentials && loaded && state.status === 'idle') {
@@ -262,7 +274,9 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
     return catalogRows.filter((r) => {
       return (
         r.artist_display.toLowerCase().includes(q) ||
-        r.title.toLowerCase().includes(q)
+        r.title.toLowerCase().includes(q) ||
+        genreLabel(r).toLowerCase().includes(q) ||
+        (r.genres || []).some((g) => g.toLowerCase().includes(q))
       );
     });
   }, [catalogRows, search]);
@@ -277,6 +291,8 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
       map.set(letter, list);
     }
     const keys = [...map.keys()].sort((a, b) => {
+      if (a === 'Unknown') return 1;
+      if (b === 'Unknown') return -1;
       if (a === '#') return 1;
       if (b === '#') return -1;
       if (a === '?') return 1;
