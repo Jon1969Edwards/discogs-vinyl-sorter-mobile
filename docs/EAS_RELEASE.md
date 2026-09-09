@@ -51,7 +51,7 @@ npm run build:preview
 Manual publish (without waiting for CI):
 
 ```bash
-npm run update:preview -- --message "genre sync"
+npm run update:preview
 ```
 
 The old preview APK (build `262046a3-…`) cannot receive OTA updates. Replace it with the new one.

@@ -17,8 +17,8 @@
     "test": "jest",
     "build:preview": "eas build --platform android --profile preview",
     "build:production": "eas build --platform android --profile production",
-    "update:preview": "eas update --channel preview --non-interactive",
-    "update:production": "eas update --channel production --non-interactive"
+    "update:preview": "eas update --channel preview --non-interactive --auto",
+    "update:production": "eas update --channel production --non-interactive --auto"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
