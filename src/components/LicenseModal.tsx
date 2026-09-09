@@ -100,8 +100,8 @@ export function LicenseModal({ visible, onClose }: Props) {
           ) : (
             <>
               <AppText variant="bodySmall" style={styles.hint}>
-                Already have a key? Paste the full key below (must start with
-                VSS1-).
+                Already have a key? Paste it below. Long keys scroll — the
+                visible end is normal. It should start with VSS1-.
               </AppText>
               <TextInput
                 style={[styles.input, styles.inputMulti]}

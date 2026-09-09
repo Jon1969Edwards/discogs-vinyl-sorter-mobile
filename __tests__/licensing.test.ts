@@ -46,7 +46,15 @@ describe('licensing', () => {
   it('rejects invalid keys', async () => {
     const result = await activateLicense('VSS1-notavalidkey.sig');
     expect(result.ok).toBe(false);
+    expect(result.message).not.toMatch(/ending/i);
     expect(await isPro()).toBe(false);
+  });
+
+  it('does not treat a missing VSS1 prefix as a truncated paste', async () => {
+    const result = await activateLicense('not-a-key');
+    expect(result.ok).toBe(false);
+    expect(result.message).toMatch(/VSS1-/);
+    expect(result.message).not.toMatch(/ending/i);
   });
 
   it('rejects keys signed with a different secret', async () => {
@@ -68,6 +76,13 @@ describe('licensing', () => {
   it('fails closed when secret is empty', () => {
     __setLicenseSecretForTests(null);
     expect(() => generateLicenseKey()).toThrow(/VSS_LICENSE_SECRET/);
+  });
+
+  it('accepts a key signed with the public Windows development secret', async () => {
+    __setLicenseSecretForTests('VSS-CHANGE-ME-IN-RELEASE-BUILDS-2026');
+    const key = generateLicenseKey('interop@test.local', 'pro', 99);
+    const result = await activateLicense(key);
+    expect(result.ok).toBe(true);
   });
 });
 

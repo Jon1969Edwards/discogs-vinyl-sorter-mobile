@@ -67,6 +67,19 @@ function envDevPro(): boolean {
   }
 }
 
+function previewOrDevChannel(): boolean {
+  if (typeof __DEV__ !== 'undefined' && __DEV__) return true;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Updates = require('expo-updates') as { channel?: string | null };
+    const channel = (Updates.channel || '').trim();
+    // Empty: Metro, Jest, or a bundle with no channel. Production channel stays fail-closed.
+    return !channel || channel === 'preview' || channel === 'development';
+  } catch {
+    return true;
+  }
+}
+
 function resolveSecret(): string {
   if (_testSecretOverride !== undefined) {
     return _testSecretOverride ?? '';
@@ -75,7 +88,9 @@ function resolveSecret(): string {
   if (fromEnv) return fromEnv;
   const bundled = (BUNDLED_LICENSE_SECRET || '').trim();
   if (bundled) return bundled;
-  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+  // Preview APKs / OTAs often compile without .env (CI has no VSS_LICENSE_SECRET).
+  // Match Windows unsigned builds so keys minted on this PC still verify.
+  if (previewOrDevChannel()) {
     return DEFAULT_SECRET;
   }
   return '';
@@ -262,12 +277,16 @@ export async function activateLicense(
   if (!trimmed.startsWith(`${LICENSE_PREFIX}-`)) {
     return {
       ok: false,
-      message: `Paste the full key starting with ${LICENSE_PREFIX}- (not just the ending).`,
+      message: `This doesn't look like a license key (it should start with ${LICENSE_PREFIX}-).`,
     };
   }
   const payload = parseKey(trimmed);
   if (!payload) {
-    return { ok: false, message: 'Invalid or expired license key.' };
+    return {
+      ok: false,
+      message:
+        'Invalid or expired license key. If this key works on Windows, this install may be using a different signing secret.',
+    };
   }
   const lic: StoredLicense = {
     valid: true,

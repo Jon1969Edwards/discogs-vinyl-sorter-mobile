@@ -23,6 +23,13 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Write .env for babel (OAuth + license HMAC)
+        env:
+          DISCOGS_CONSUMER_KEY: ${{ secrets.DISCOGS_CONSUMER_KEY }}
+          DISCOGS_CONSUMER_SECRET: ${{ secrets.DISCOGS_CONSUMER_SECRET }}
+          VSS_LICENSE_SECRET: ${{ secrets.VSS_LICENSE_SECRET }}
+        run: node scripts/eas-write-env.js
+
       - name: Publish OTA update
         run: |
           CHANNEL=preview
