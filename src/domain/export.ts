@@ -188,6 +188,8 @@ export function generateJson(rows: ReleaseRow[]): string {
     notes: r.notes,
     sort_artist: r.sort_artist,
     sort_title: r.sort_title,
+    release_id: r.release_id ?? null,
+    item_id: r.item_id || '',
     genre: genreLabel(r),
     genres: r.genres || [],
     styles: r.styles || [],

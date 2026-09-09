@@ -92,7 +92,7 @@ flowchart TD
 1. **Collection:** Fetch all folder-0 releases → tag `format_categories` → filter by saved `formats` (default `['lp']`) → sort with GUI build options (`lastNameFirst`, `lnfSafeBands`, `lnfAllow3=false`, `variousPolicy=normal` from `GUI_BUILD_SORT` in `src/types/index.ts`).
 2. **Export:** TXT / CSV / JSON aligned with Windows `core/export.py`; `divider_mode`: `none` | `letter` | `abc`. When `sort_by` is `genre`, TXT uses `=== Jazz ===` section headers (letter/ABC ignored).
 3. **Config** (AsyncStorage key `discogs_app_settings`): `formats`, `divider_mode`, `sort_by` (`artist` | `title` | `year` | `genre` | `price_asc` | `price_desc`), `currency`, `write_json`, `poll_seconds`, `show_prices`, `save_last_export`, `user_agent`, `per_page`.
-3b. **Genre edits:** AsyncStorage `spindle_genre_overrides` (Windows `genre_overrides.json`). Album detail **Edit genre**; survives Discogs refresh.
+3b. **Genre edits:** AsyncStorage `spindle_genre_overrides` (Windows `genre_overrides.json`). Album detail **Edit genre**; survives Discogs refresh. Transfer with Settings **Export / Import genre edits** (same JSON on both apps; imported keys win, other local edits stay).
 4. **Pro:** Free capped at 100 records; prices, manual order, and ABC dividers require Pro (`VSS1` key). Soft upsell modals.
 5. **Wishlist:** Local entries + sync from Discogs wantlist during collection build (best-effort).
 6. **Cache:** Full row cache per username; collection item count for stale detection; 7-day price TTL in cache service; last sync timestamp on stale banner.

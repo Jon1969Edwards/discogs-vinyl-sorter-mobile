@@ -83,6 +83,9 @@ export {
   clearGenreOverride,
   hasGenreOverride,
   subscribeGenreOverrides,
+  countGenreOverrides,
+  exportGenreOverridesJson,
+  importGenreOverridesFromJson,
 } from './genreOverrides';
 
 export { useCachedThumb, getCachedThumbUri } from './thumbnailCache';

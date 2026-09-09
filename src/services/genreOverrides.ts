@@ -7,7 +7,9 @@ import type { ReleaseRow } from '../types';
 import {
   applyGenreOverrideMap,
   applyOverrideEntry,
+  normalizeOverrideKey,
   parseGenreList,
+  parseOverridesPayload,
   primaryGenre,
   rowOverrideKey,
   UNKNOWN_GENRE,
@@ -87,6 +89,48 @@ export async function setGenreOverride(
   const next = applyOverrideEntry(row, entry);
   notify();
   return next;
+}
+
+export function countGenreOverrides(): number {
+  return Object.keys(memory.overrides).length;
+}
+
+export async function exportGenreOverridesJson(): Promise<string> {
+  await loadGenreOverrides();
+  return JSON.stringify({ version: 1, overrides: memory.overrides }, null, 2);
+}
+
+export async function mergeImportedOverrides(
+  incoming: Record<string, GenreOverrideEntry>
+): Promise<number> {
+  await loadGenreOverrides();
+  let added = 0;
+  for (const [key, entry] of Object.entries(incoming)) {
+    memory.overrides[normalizeOverrideKey(key)] = {
+      genre: entry.genre || UNKNOWN_GENRE,
+      genres: [...(entry.genres || [])],
+    };
+    added += 1;
+  }
+  if (added) {
+    await persist();
+    notify();
+  }
+  return added;
+}
+
+export async function importGenreOverridesFromJson(text: string): Promise<number> {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error('That is not valid JSON.');
+  }
+  const incoming = parseOverridesPayload(data);
+  if (Object.keys(incoming).length === 0) {
+    throw new Error('No genre edits found in that file.');
+  }
+  return mergeImportedOverrides(incoming);
 }
 
 export async function clearGenreOverride(row: ReleaseRow): Promise<ReleaseRow> {

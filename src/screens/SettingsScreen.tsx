@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
+  Alert,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -25,6 +27,12 @@ import {
   canFetchPrices,
   canUseAbcDividers,
 } from '../services/featureGate';
+import {
+  countGenreOverrides,
+  exportGenreOverridesJson,
+  importGenreOverridesFromJson,
+  loadGenreOverrides,
+} from '../services/genreOverrides';
 import { colors, radius, spacing } from '../theme';
 import {
   APP_NAME,
@@ -115,6 +123,115 @@ export function SettingsScreen({
       setSaving(false);
     }
   }, [currencyDraft, currencyDirty, update, onSettingsChanged]);
+
+  const exportGenreEdits = useCallback(async () => {
+    try {
+      await loadGenreOverrides();
+      if (countGenreOverrides() === 0) {
+        Alert.alert('Genre edits', 'No genre edits to export yet.');
+        return;
+      }
+      const json = await exportGenreOverridesJson();
+      const FileSystem = await import('expo-file-system/legacy');
+      const Sharing = await import('expo-sharing');
+      const filename = 'genre_overrides.json';
+      const cachePath = `${FileSystem.cacheDirectory}${filename}`;
+      await FileSystem.writeAsStringAsync(cachePath, json, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(cachePath, {
+          mimeType: 'application/json',
+          dialogTitle: 'Share genre edits',
+        });
+      } else {
+        const Clipboard = await import('expo-clipboard');
+        await Clipboard.setStringAsync(json);
+        Alert.alert('Copied', 'Genre edits JSON copied to the clipboard.');
+      }
+    } catch (err) {
+      Alert.alert('Export failed', err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  const applyImportedJson = useCallback(async (text: string) => {
+    const n = await importGenreOverridesFromJson(text);
+    onSettingsChanged?.();
+    Alert.alert(
+      'Genre edits imported',
+      n === 1 ? 'Imported 1 genre edit.' : `Imported ${n} genre edits.`
+    );
+  }, [onSettingsChanged]);
+
+  const importFromClipboard = useCallback(async () => {
+    try {
+      const Clipboard = await import('expo-clipboard');
+      const text = (await Clipboard.getStringAsync()).trim();
+      if (!text) {
+        Alert.alert(
+          'Clipboard is empty',
+          'Copy genre_overrides.json from the desktop app, then try again.'
+        );
+        return;
+      }
+      await applyImportedJson(text);
+    } catch (err) {
+      Alert.alert('Import failed', err instanceof Error ? err.message : String(err));
+    }
+  }, [applyImportedJson]);
+
+  const importFromFolder = useCallback(async () => {
+    try {
+      const FileSystem = await import('expo-file-system/legacy');
+      const permissions =
+        await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+      if (!permissions.granted) return;
+      const files = await FileSystem.StorageAccessFramework.readDirectoryAsync(
+        permissions.directoryUri
+      );
+      const decoded = files.map((uri) => ({
+        uri,
+        name: decodeURIComponent(uri).toLowerCase(),
+      }));
+      const preferred =
+        decoded.find((f) => f.name.endsWith('genre_overrides.json')) ||
+        (decoded.filter((f) => f.name.endsWith('.json')).length === 1
+          ? decoded.find((f) => f.name.endsWith('.json'))
+          : undefined);
+      if (!preferred) {
+        Alert.alert(
+          'Import failed',
+          'That folder has no genre_overrides.json file. Export it from desktop Settings first.'
+        );
+        return;
+      }
+      const text = await FileSystem.readAsStringAsync(preferred.uri, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+      await applyImportedJson(text);
+    } catch (err) {
+      Alert.alert('Import failed', err instanceof Error ? err.message : String(err));
+    }
+  }, [applyImportedJson]);
+
+  const importGenreEdits = useCallback(() => {
+    const buttons: {
+      text: string;
+      style?: 'cancel' | 'default' | 'destructive';
+      onPress?: () => void;
+    }[] = [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Paste from clipboard', onPress: () => void importFromClipboard() },
+    ];
+    if (Platform.OS === 'android') {
+      buttons.push({ text: 'Choose folder', onPress: () => void importFromFolder() });
+    }
+    Alert.alert(
+      'Import genre edits',
+      'Use the genre_overrides.json file from desktop Settings. Paste its contents, or on Android pick the folder that contains it.',
+      buttons
+    );
+  }, [importFromClipboard, importFromFolder]);
 
   const handleDone = useCallback(async () => {
     await saveCurrency();
@@ -209,6 +326,22 @@ export function SettingsScreen({
               </TouchableOpacity>
             ))}
           </View>
+        </SettingsSection>
+
+        <SettingsSection title="Genre edits">
+          <AppText variant="caption" style={styles.aboutCaption}>
+            Desktop and phone keep these separately. Export a JSON file from
+            one and import it on the other.
+          </AppText>
+          <TouchableOpacity style={styles.proBtn} onPress={() => void exportGenreEdits()}>
+            <AppText style={styles.proBtnText}>Export genre edits</AppText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.proBtnSecondary}
+            onPress={importGenreEdits}
+          >
+            <AppText style={styles.proBtnTextSecondary}>Import genre edits</AppText>
+          </TouchableOpacity>
         </SettingsSection>
 
         <SettingsSection title="Pro">

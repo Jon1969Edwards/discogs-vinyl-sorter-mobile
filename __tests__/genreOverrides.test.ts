@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   applyGenreOverrideMap,
   parseGenreList,
+  parseOverridesPayload,
   primaryGenre,
 } from '../src/domain/genre';
 import {
@@ -10,6 +11,7 @@ import {
   applyGenreOverrides,
   clearGenreOverride,
   hasGenreOverride,
+  importGenreOverridesFromJson,
   setGenreOverride,
 } from '../src/services/genreOverrides';
 import { sortRows } from '../src/domain/sorting';
@@ -85,5 +87,35 @@ describe('genre overrides', () => {
     const reset = await clearGenreOverride(applied);
     expect(reset.genre).toBe('Jazz');
     expect(hasGenreOverride(applied)).toBe(false);
+  });
+
+  it('parses desktop genre_overrides.json and merges without dropping locals', async () => {
+    const local = row(1, 'Jazz', 'Miles');
+    await setGenreOverride(local, 'Funk / Soul');
+
+    const desktop = {
+      version: 1,
+      overrides: {
+        '19000885': { genre: 'Punk/Hardcore, Reggae', genres: ['Punk/Hardcore, Reggae'] },
+        'discogs:6057905': { genre: 'Indie', genres: ['Indie'] },
+      },
+    };
+    const parsed = parseOverridesPayload(desktop);
+    expect(parsed['discogs:19000885'].genre).toBe('Punk/Hardcore, Reggae');
+    expect(parsed['discogs:6057905'].genre).toBe('Indie');
+
+    const n = await importGenreOverridesFromJson(JSON.stringify(desktop));
+    expect(n).toBe(2);
+    const [miles] = await applyGenreOverrides([row(1, 'Jazz', 'Miles')]);
+    expect(miles.genre).toBe('Funk / Soul');
+    const [indie] = await applyGenreOverrides([row(6057905, 'Rock')]);
+    expect(indie.genre).toBe('Indie');
+  });
+
+  it('accepts a collection JSON array with release_id', () => {
+    const parsed = parseOverridesPayload([
+      { release_id: 6171913, genre: 'Oi!/Streetpunk', genres: ['Oi!/Streetpunk'] },
+    ]);
+    expect(parsed['discogs:6171913'].genre).toBe('Oi!/Streetpunk');
   });
 });
