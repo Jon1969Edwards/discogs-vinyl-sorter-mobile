@@ -36,7 +36,20 @@
       "expo-updates",
       "./plugins/withAndroidDiscogsQueries.js",
       "expo-web-browser",
-      "expo-document-picker"
+      "expo-document-picker",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Spindle to scan barcodes and photograph album covers.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Spindle to choose album cover photos for identification."
+        }
+      ]
     ],
     "extra": {
       "eas": {

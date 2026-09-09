@@ -1,5 +1,5 @@
 /**
- * Custom tab bar – Collection and Wishlist (no @react-navigation/bottom-tabs).
+ * Custom tab bar – Collection, Scan, Wishlist.
  */
 
 import React, { useState } from 'react';
@@ -7,11 +7,12 @@ import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { CollectionScreen } from '../screens/CollectionScreen';
+import { ScannerScreen } from '../screens/ScannerScreen';
 import { WishlistScreen } from '../screens/WishlistScreen';
 import { AppText } from '../components/ui/AppText';
 import { colors, spacing } from '../theme';
 
-type TabId = 'collection' | 'wishlist';
+type TabId = 'collection' | 'scan' | 'wishlist';
 
 type MainTabsProps = {
   navigation: {
@@ -29,8 +30,11 @@ export function MainTabs({ navigation, onSignOut }: MainTabsProps) {
       <View style={[styles.content, activeTab !== 'collection' && styles.hidden]}>
         <CollectionScreen navigation={navigation} onSignOut={onSignOut} />
       </View>
+      <View style={[styles.content, activeTab !== 'scan' && styles.hidden]}>
+        <ScannerScreen navigation={navigation} />
+      </View>
       <View style={[styles.content, activeTab !== 'wishlist' && styles.hidden]}>
-        <WishlistScreen navigation={navigation} onSignOut={onSignOut} />
+        <WishlistScreen />
       </View>
       <View style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
         <TouchableOpacity
@@ -53,6 +57,28 @@ export function MainTabs({ navigation, onSignOut }: MainTabsProps) {
             ]}
           >
             Collection
+          </AppText>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'scan' && styles.tabActive]}
+          onPress={() => setActiveTab('scan')}
+          activeOpacity={0.7}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'scan' }}
+        >
+          <Ionicons
+            name={activeTab === 'scan' ? 'scan' : 'scan-outline'}
+            size={22}
+            color={activeTab === 'scan' ? colors.accent : colors.textMuted}
+          />
+          <AppText
+            variant="bodySmall"
+            style={[
+              styles.tabLabel,
+              activeTab === 'scan' && styles.tabLabelActive,
+            ]}
+          >
+            Scan
           </AppText>
         </TouchableOpacity>
         <TouchableOpacity

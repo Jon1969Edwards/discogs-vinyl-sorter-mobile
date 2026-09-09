@@ -7,10 +7,12 @@ export {
   iterateCollection,
   fetchMarketplaceStats,
   attachPricesToRows,
+  searchDatabase,
   type DiscogsIdentity,
   type DiscogsCollectionRelease,
   type DiscogsCollectionResponse,
   type DiscogsMarketplaceStats,
+  type DiscogsSearchResult,
 } from './discogsApi';
 
 export {

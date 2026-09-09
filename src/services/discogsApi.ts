@@ -491,6 +491,67 @@ export async function attachPricesToRows(
   await batchSetCachedPrices(pendingUpdates, currency);
 }
 
+/** Discogs `/database/search` hit (release-oriented fields). */
+export interface DiscogsSearchResult {
+  id: number;
+  type?: string;
+  title: string;
+  year?: string | number;
+  thumb?: string;
+  cover_image?: string;
+  resource_url?: string;
+  master_id?: number;
+  country?: string;
+  format?: string[];
+  label?: string[];
+  genre?: string[];
+  style?: string[];
+  barcode?: string[];
+  catno?: string;
+  uri?: string;
+}
+
+export interface DiscogsSearchResponse {
+  pagination: DiscogsPagination;
+  results: DiscogsSearchResult[];
+}
+
+export type DiscogsSearchParams = {
+  barcode?: string;
+  catno?: string;
+  query?: string;
+  type?: 'release' | 'master' | 'artist' | 'label';
+  perPage?: number;
+  page?: number;
+};
+
+export async function searchDatabase(
+  client: AxiosInstance,
+  params: DiscogsSearchParams
+): Promise<DiscogsSearchResult[]> {
+  const q: Record<string, string> = {
+    type: params.type ?? 'release',
+    per_page: String(params.perPage ?? 25),
+    page: String(params.page ?? 1),
+  };
+  if (params.barcode?.trim()) q.barcode = params.barcode.trim();
+  if (params.catno?.trim()) q.catno = params.catno.trim();
+  if (params.query?.trim()) q.q = params.query.trim();
+
+  if (!q.barcode && !q.catno && !q.q) {
+    return [];
+  }
+
+  const data = await apiGet<DiscogsSearchResponse>(
+    client,
+    '/database/search',
+    q
+  );
+  return (data.results ?? []).filter(
+    (r) => r.type === 'release' || r.type == null || params.type === 'release'
+  );
+}
+
 export async function fetchMarketplaceStats(
   client: AxiosInstance,
   releaseId: number,
