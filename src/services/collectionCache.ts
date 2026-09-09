@@ -63,6 +63,11 @@ export async function setCacheUsername(username: string): Promise<void> {
   }
 }
 
+export async function getCacheUsername(): Promise<string | null> {
+  const data = await load();
+  return data.username;
+}
+
 export type FreshPriceEntry = {
   lowest: number | null;
   numForSale: number | null;

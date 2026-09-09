@@ -25,6 +25,9 @@ export interface ReleaseRow {
   release_id?: number | null;
   master_id?: number | null;
   instance_id?: number | null;
+  folder_id?: number | null;
+  collection_notes?: unknown;
+  spindle_genre_edit?: string;
   sort_artist: string;
   sort_title: string;
   format_categories?: Set<string>;

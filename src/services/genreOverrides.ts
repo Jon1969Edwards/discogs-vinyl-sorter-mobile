@@ -61,10 +61,14 @@ export async function loadGenreOverrides(): Promise<Record<string, GenreOverride
 }
 
 export function hasGenreOverride(row: ReleaseRow): boolean {
+  return getGenreOverride(row) != null;
+}
+
+export function getGenreOverride(row: ReleaseRow): GenreOverrideEntry | undefined {
   for (const key of overrideLookupKeys(row)) {
-    if (memory.overrides[key]) return true;
+    if (memory.overrides[key]) return memory.overrides[key];
   }
-  return false;
+  return undefined;
 }
 
 export async function applyGenreOverrides(rows: ReleaseRow[]): Promise<ReleaseRow[]> {

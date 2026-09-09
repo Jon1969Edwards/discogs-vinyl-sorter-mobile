@@ -5,7 +5,7 @@
 import type { DiscogsCollectionRelease } from '../services/discogsApi';
 import type { ReleaseRow, SortBy, VariousPolicy } from '../types';
 import { GUI_BUILD_SORT } from '../types';
-import { formatCollectionNotes } from '../utils/collectionNotes';
+import { formatCollectionNotes, extractSpindleGenreFromNotes } from '../utils/collectionNotes';
 import { filterRowsByFormat } from './formatFilter';
 import {
   UNKNOWN_GENRE,
@@ -393,6 +393,8 @@ export function buildReleaseRow(
   const styles = stylesFromBasic(basic);
   const genre = primaryGenre(genres);
   const itemId = relId != null ? `discogs:${relId}` : '';
+  const marked = extractSpindleGenreFromNotes(item.notes);
+  const folderId = item.folder_id && item.folder_id !== 0 ? item.folder_id : 1;
 
   return {
     artist_display: artistDisplay,
@@ -405,6 +407,9 @@ export function buildReleaseRow(
     discogs_url: url,
     notes: formatCollectionNotes(item.notes),
     instance_id: item.instance_id ?? null,
+    folder_id: folderId,
+    collection_notes: item.notes,
+    spindle_genre_edit: marked?.genre || '',
     release_id: relId ?? null,
     master_id: basic.master_id ?? null,
     sort_artist: sortArtist,

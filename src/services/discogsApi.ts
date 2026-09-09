@@ -47,6 +47,7 @@ export interface DiscogsPagination {
 export interface DiscogsCollectionRelease {
   id: number;
   instance_id: number;
+  folder_id?: number;
   date_added: string;
   rating?: number;
   basic_information: {
@@ -226,6 +227,44 @@ export async function apiGet<T>(
       }
 
       // Network error (no response) – retry
+      if (!axErr?.response && attempt < retries - 1) {
+        const delay = getRetryDelay(undefined, attempt);
+        await sleep(delay);
+        continue;
+      }
+
+      throw lastError;
+    }
+  }
+
+  throw lastError ?? new Error('API request failed after retries');
+}
+
+export async function apiPost(
+  client: AxiosInstance,
+  url: string,
+  params?: Record<string, string>,
+  retries = 3
+): Promise<void> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      await client.post(url, undefined, { params });
+      return;
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      const axErr = err as { response?: AxiosResponse; isAxiosError?: boolean };
+
+      if (axErr?.isAxiosError && axErr.response) {
+        const status = axErr.response.status;
+        if (shouldRetry(status) && attempt < retries - 1) {
+          const delay = getRetryDelay(axErr.response, attempt);
+          await sleep(delay);
+          continue;
+        }
+      }
+
       if (!axErr?.response && attempt < retries - 1) {
         const delay = getRetryDelay(undefined, attempt);
         await sleep(delay);

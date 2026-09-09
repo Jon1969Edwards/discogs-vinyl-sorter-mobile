@@ -31,6 +31,9 @@ import {
   applyGenreOverrides,
 } from '../services/genreOverrides';
 import {
+  syncGenreOverridesWithDiscogs,
+} from '../services/genreSync';
+import {
   markFullFetch,
   setCacheUsername,
   saveCachedRows,
@@ -114,6 +117,16 @@ export function useCollection() {
           lnfExclude: GUI_BUILD_SORT.lnfExclude,
           lnfSafeBands: GUI_BUILD_SORT.lnfSafeBands,
         });
+
+        try {
+          await syncGenreOverridesWithDiscogs(
+            client,
+            identity.username,
+            allRows
+          );
+        } catch {
+          // genre sync is best-effort
+        }
 
         const formatSet = formatsToSet(settings.formats);
         let processed = filterRowsByFormat(allRows, formatSet);

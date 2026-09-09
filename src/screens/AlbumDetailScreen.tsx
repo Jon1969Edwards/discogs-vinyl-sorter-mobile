@@ -24,8 +24,10 @@ import {
   removeFromWishlist,
   loadLocalWishlist,
   isInWishlist,
+  getIdentity,
 } from '../services';
-import { getCachedPrice } from '../services/collectionCache';
+import { getCachedPrice, getCacheUsername } from '../services/collectionCache';
+import { pushGenreEdit } from '../services/genreSync';
 import { canFetchPrices } from '../services/featureGate';
 import { formatCollectionNotes } from '../utils/collectionNotes';
 import { formatMarketplacePrice } from '../utils/formatPrice';
@@ -169,6 +171,22 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
       if (next) {
         setRelease(next);
         setGenreOverrideFlag(true);
+        void (async () => {
+          try {
+            const cred = await getStoredCredentials();
+            if (!cred) return;
+            const client = createDiscogsClient(cred);
+            const username =
+              (await getCacheUsername()) || (await getIdentity(client)).username;
+            const genresText =
+              next.genres && next.genres.length
+                ? next.genres.join('; ')
+                : next.genre || '';
+            await pushGenreEdit(client, username, next, genresText);
+          } catch {
+            // next collection refresh retries
+          }
+        })();
       }
       setGenreEditOpen(false);
     },
@@ -180,6 +198,18 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
     setRelease(next);
     setGenreOverrideFlag(false);
     setGenreEditOpen(false);
+    void (async () => {
+      try {
+        const cred = await getStoredCredentials();
+        if (!cred) return;
+        const client = createDiscogsClient(cred);
+        const username =
+          (await getCacheUsername()) || (await getIdentity(client)).username;
+        await pushGenreEdit(client, username, next, null);
+      } catch {
+        // next collection refresh retries
+      }
+    })();
   }, [release]);
 
   return (
