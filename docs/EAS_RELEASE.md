@@ -26,6 +26,34 @@ Add `DISCOGS_CONSUMER_KEY`, `DISCOGS_CONSUMER_SECRET`, and optionally `VSS_LICEN
 
 After adding or changing variables, you must run a **new** build (reinstall the new APK).
 
+## Over-the-air updates (JS / UI)
+
+Day-to-day TypeScript changes do **not** need a new APK. After this `preview` APK is installed:
+
+1. Push to `develop` (or `main`) — GitHub Action publishes an [EAS Update](https://docs.expo.dev/eas-update/introduction/).
+2. Open Spindle (or return it to the foreground). It asks **Restart now** if a bundle is waiting.
+3. Settings → About → **Check for updates** does the same check on demand.
+
+Native changes (new Expo modules, `app.json` plugins, icons, OAuth secrets baked into the binary) still need `npm run build:preview` and a reinstall.
+
+**One-time setup**
+
+1. Create an Expo access token: [expo.dev/settings/access-tokens](https://expo.dev/settings/access-tokens).
+2. Add repo secret `EXPO_TOKEN` on [discogs-vinyl-sorter-mobile](https://github.com/Jon1969Edwards/discogs-vinyl-sorter-mobile) → Settings → Secrets.
+3. Build and install a **new** preview APK (this one includes `expo-updates`):
+
+```bash
+npm run build:preview
+```
+
+Manual publish (without waiting for CI):
+
+```bash
+npm run update:preview -- --message "genre sync"
+```
+
+The old preview APK (build `262046a3-…`) cannot receive OTA updates. Replace it with the new one.
+
 ## Launcher icon and splash
 
 Icon paths are in [app.json](../app.json) (`assets/icon.png`, `adaptive-icon.png`, `splash-icon.png`). Metro/dev client may not update the home-screen icon. To see new artwork on a installed APK, run a **new** `preview` or `production` build and reinstall.
@@ -69,7 +97,7 @@ After the build finishes, download the APK from the dashboard and run [SMOKE_TES
 
 **OAuth on EAS:** add `DISCOGS_CONSUMER_KEY` and `DISCOGS_CONSUMER_SECRET` as EAS secrets for the `preview` environment if OAuth fails on the standalone APK (local `.env` is not uploaded).
 
-**Note:** Re-run `npm run build:preview` after committing plan changes (list prices, docs) so the APK includes the latest code.
+**Note:** After the first OTA-capable preview APK is installed, JS changes go out with `eas update` (or the GitHub Action). Rebuild the APK only for native/config changes.
 
 ## Troubleshooting
 

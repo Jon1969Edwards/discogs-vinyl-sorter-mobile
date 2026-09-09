@@ -1,0 +1,32 @@
+name: EAS Update
+
+on:
+  push:
+    branches: [develop, main]
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Publish OTA update
+        run: |
+          CHANNEL=preview
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            CHANNEL=production
+          fi
+          eas update --channel "$CHANNEL" --message "${GITHUB_SHA::7} ${GITHUB_REF_NAME}" --non-interactive

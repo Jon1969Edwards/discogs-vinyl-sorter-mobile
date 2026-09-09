@@ -17,6 +17,7 @@ import { MainTabs } from './src/navigation/MainTabs';
 import { SettingsProvider } from './src/context/SettingsContext';
 import { LicenseProvider } from './src/context/LicenseContext';
 import { hasStoredCredentials } from './src/services';
+import { subscribeOtaUpdateChecks } from './src/services/appUpdates';
 
 const Stack = createNativeStackNavigator();
 
@@ -26,6 +27,8 @@ export default function App() {
   useEffect(() => {
     hasStoredCredentials().then(setHasToken);
   }, []);
+
+  useEffect(() => subscribeOtaUpdateChecks(), []);
 
   const handleAuthenticated = () => setHasToken(true);
   const handleSignOut = () => setHasToken(false);

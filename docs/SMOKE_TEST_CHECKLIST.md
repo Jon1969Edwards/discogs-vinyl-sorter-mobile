@@ -24,6 +24,7 @@ Run after merging to `main` or before an EAS release build. Requires the **dev c
 | 8c | Album detail → **Edit genre** → save; list updates; pull-to-refresh keeps the edit | |
 | 8d | Edit genre → **Reset to original** restores Discogs genre | |
 | 8e | Edit genre on desktop, pull-to-refresh on phone → same genre | |
+| 8f | Preview APK: Settings → **Check for updates** (or relaunch after an `eas update`) | |
 | 9 | Export TXT → share sheet; note that file saved when “Save last export” on | |
 | 10 | Airplane mode → cached collection banner with last sync time | |
 | 11 | Optional: Deactivate Pro → Free limits return | |

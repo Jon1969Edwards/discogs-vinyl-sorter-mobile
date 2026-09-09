@@ -21,10 +21,8 @@ import { SettingsSection } from '../components/ui/SettingsSection';
 import { LicenseModal } from '../components/LicenseModal';
 import { ProUpgradeModal } from '../components/ProUpgradeModal';
 import { useLicense } from '../context/LicenseContext';
-import {
-  canFetchPrices,
-  canUseAbcDividers,
-} from '../services/featureGate';
+import { canFetchPrices, canUseAbcDividers } from '../services/featureGate';
+import { promptIfOtaUpdate } from '../services/appUpdates';
 import { colors, radius, spacing } from '../theme';
 import {
   APP_NAME,
@@ -376,6 +374,12 @@ export function SettingsScreen({
           <AppText variant="caption" style={styles.aboutCaption}>
             Support: {SUPPORT_EMAIL}
           </AppText>
+          <TouchableOpacity
+            style={styles.proBtnSecondary}
+            onPress={() => void promptIfOtaUpdate({ force: true, silentIfNone: false })}
+          >
+            <AppText style={styles.proBtnTextSecondary}>Check for updates</AppText>
+          </TouchableOpacity>
         </SettingsSection>
 
         <SettingsSection title="Account">
