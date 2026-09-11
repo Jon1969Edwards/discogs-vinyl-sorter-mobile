@@ -402,6 +402,28 @@ export function useCollection() {
     []
   );
 
+  const reloadFromCache = useCallback(async () => {
+    const cached = await loadCachedRows();
+    if (!cached) return;
+    const settings = await loadSettings();
+    let processed = await applyGenreOverrides(cached.rows);
+    processed = sortRows(
+      processed,
+      GUI_BUILD_SORT.variousPolicy,
+      settings.sort_by as SortBy
+    );
+    processed = await applyManualOrder(processed);
+    setState((prev) => ({
+      status: 'success',
+      rows: processed,
+      username: cached.username,
+      stale: prev.status === 'success' ? prev.stale : false,
+      lastSyncedAt:
+        prev.status === 'success' ? prev.lastSyncedAt : cached.saved_at,
+      itemCount: processed.length,
+    }));
+  }, []);
+
   const applyGenreEdits = useCallback(async () => {
     const settings = await loadSettings();
     setState((prev) => {
@@ -437,6 +459,7 @@ export function useCollection() {
     state,
     fetchCollection,
     refreshCollection,
+    reloadFromCache,
     repriceCollection,
     applyGenreEdits,
     reset,

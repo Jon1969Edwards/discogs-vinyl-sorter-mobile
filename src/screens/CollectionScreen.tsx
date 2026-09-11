@@ -34,6 +34,7 @@ import {
   getStoredCredentials,
   clearStoredCredentials,
   exportAndShare,
+  isLocalCredentials,
   type ExportFormat,
 } from '../services';
 import { subscribeLocalCollection } from '../services/localCollection';
@@ -139,7 +140,7 @@ function AlbumRow({
 export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProps) {
   const { settings, loaded } = useSettings();
   const { isPro } = useLicense();
-  const { state, fetchCollection, refreshCollection, repriceCollection, applyGenreEdits, reset } =
+  const { state, fetchCollection, refreshCollection, repriceCollection, applyGenreEdits, reloadFromCache, reset } =
     useCollection();
   const [credentials, setCredentials] = useState<import('../services').DiscogsCredentials | null>(null);
   const [search, setSearch] = useState('');
@@ -166,10 +167,12 @@ export function CollectionScreen({ navigation, onSignOut }: CollectionScreenProp
       subscribeLocalCollection(() => {
         void getStoredCredentials().then((cred) => {
           setCredentials(cred);
-          if (cred) void fetchCollection(cred);
+          if (!cred) return;
+          if (isLocalCredentials(cred)) void fetchCollection(cred);
+          else void reloadFromCache();
         });
       }),
-    [fetchCollection]
+    [fetchCollection, reloadFromCache]
   );
 
   useEffect(() => subscribeGenreOverrides(() => {

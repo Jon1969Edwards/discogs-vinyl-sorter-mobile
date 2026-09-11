@@ -295,6 +295,19 @@ export async function apiPost(
   throw lastError ?? new Error('API request failed after retries');
 }
 
+/** Add a release to a collection folder (1 = Uncategorized). */
+export async function addReleaseToDiscogsCollection(
+  client: AxiosInstance,
+  username: string,
+  releaseId: number,
+  folderId = 1
+): Promise<void> {
+  await apiPost(
+    client,
+    `/users/${username}/collection/folders/${folderId}/releases/${releaseId}`
+  );
+}
+
 // ---------------------------------------------------------------------------
 // API methods
 // ---------------------------------------------------------------------------

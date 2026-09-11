@@ -1,5 +1,5 @@
 /**
- * Album detail screen – full release info, Discogs / Spotify / wishlist.
+ * Album detail screen – full release info, Discogs / Spotify / collection / wishlist.
  */
 
 import React, { useCallback, useState } from 'react';
@@ -10,6 +10,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useFocusEffect } from '@react-navigation/native';
@@ -25,6 +26,8 @@ import {
   loadLocalWishlist,
   isInWishlist,
   getIdentity,
+  addReleaseToUserCollection,
+  isInUserCollection,
 } from '../services';
 import { getCachedPrice, getCacheUsername } from '../services/collectionCache';
 import { pushGenreEdit } from '../services/genreSync';
@@ -62,6 +65,8 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
   const [priceLoading, setPriceLoading] = useState(false);
   const [priceFromCache, setPriceFromCache] = useState(false);
   const [inWishlist, setInWishlist] = useState(false);
+  const [inCollection, setInCollection] = useState(false);
+  const [addingCollection, setAddingCollection] = useState(false);
   const [licenseOpen, setLicenseOpen] = useState(false);
   const [upsellOpen, setUpsellOpen] = useState(false);
   const [genreEditOpen, setGenreEditOpen] = useState(false);
@@ -77,6 +82,7 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
       void loadGenreOverrides().then(() => {
         setGenreOverrideFlag(hasGenreOverride(route.params.release));
       });
+      void isInUserCollection(route.params.release).then(setInCollection);
       void loadLocalWishlist().then((list) => {
         setInWishlist(
           isInWishlist(
@@ -164,6 +170,25 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
       setInWishlist(true);
     }
   }, [inWishlist, release]);
+
+  const addToCollection = useCallback(async () => {
+    if (inCollection || addingCollection) return;
+    setAddingCollection(true);
+    try {
+      const result = await addReleaseToUserCollection(release);
+      setInCollection(true);
+      if (result.warning) {
+        Alert.alert('Added to collection', result.warning);
+      }
+    } catch (err) {
+      Alert.alert(
+        'Could not add to collection',
+        err instanceof Error ? err.message : 'Try again.'
+      );
+    } finally {
+      setAddingCollection(false);
+    }
+  }, [addingCollection, inCollection, release]);
 
   const saveGenre = useCallback(
     async (text: string) => {
@@ -304,6 +329,24 @@ export function AlbumDetailScreen({ route, navigation }: AlbumDetailScreenProps)
         ) : null}
 
         <View style={styles.actions}>
+          <TouchableOpacity
+            style={[styles.actionBtn, inCollection && styles.actionBtnMuted]}
+            onPress={() => void addToCollection()}
+            disabled={inCollection || addingCollection}
+          >
+            {addingCollection ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <Text
+                style={[
+                  styles.actionBtnText,
+                  inCollection && styles.actionBtnTextMuted,
+                ]}
+              >
+                {inCollection ? 'In collection' : 'Add to Collection'}
+              </Text>
+            )}
+          </TouchableOpacity>
           {release.discogs_url ? (
             <TouchableOpacity
               style={styles.actionBtn}
@@ -492,9 +535,15 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     alignItems: 'center',
   },
+  actionBtnMuted: {
+    backgroundColor: colors.surface,
+  },
   actionBtnText: {
     color: colors.white,
     fontSize: 16,
     fontWeight: '600',
+  },
+  actionBtnTextMuted: {
+    color: colors.textSecondary,
   },
 });

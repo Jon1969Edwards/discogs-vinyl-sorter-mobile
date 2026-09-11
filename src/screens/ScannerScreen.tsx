@@ -395,6 +395,8 @@ export function ScannerScreen({ navigation }: Props) {
     Platform.OS !== 'web' &&
     permission?.granted;
 
+  const compactResults = results.length > 0;
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
@@ -475,10 +477,12 @@ export function ScannerScreen({ navigation }: Props) {
 
       {mode === 'catno' ? (
         <View style={styles.form}>
-          <AppText variant="caption">
-            Photograph the catalog number close-up on the label, spine, or
-            sleeve.
-          </AppText>
+          {compactResults ? null : (
+            <AppText variant="caption">
+              Photograph the catalog number close-up on the label, spine, or
+              sleeve.
+            </AppText>
+          )}
           <View style={styles.coverActions}>
             <Button
               title="Take photo"
@@ -492,36 +496,60 @@ export function ScannerScreen({ navigation }: Props) {
               style={styles.flexBtn}
             />
           </View>
-          {catnoUri ? (
-            <Image
-              source={{ uri: catnoUri }}
-              style={styles.coverPreview}
-              contentFit="cover"
-            />
-          ) : null}
-          <AppText variant="caption" style={styles.fieldLabel}>
-            Catalog number (e.g. PCS 7088)
-          </AppText>
-          <TextInput
-            style={styles.input}
-            value={catno}
-            onChangeText={setCatno}
-            placeholder="Enter catno"
-            placeholderTextColor={colors.textMuted}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            onSubmitEditing={searchCatno}
-          />
+          {compactResults && catnoUri ? (
+            <View style={styles.compactRow}>
+              <Image
+                source={{ uri: catnoUri }}
+                style={styles.coverPreviewCompact}
+                contentFit="cover"
+              />
+              <TextInput
+                style={[styles.input, styles.inputFlex]}
+                value={catno}
+                onChangeText={setCatno}
+                placeholder="Enter catno"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                onSubmitEditing={searchCatno}
+              />
+            </View>
+          ) : (
+            <>
+              {catnoUri ? (
+                <Image
+                  source={{ uri: catnoUri }}
+                  style={styles.coverPreview}
+                  contentFit="cover"
+                />
+              ) : null}
+              <AppText variant="caption" style={styles.fieldLabel}>
+                Catalog number (e.g. PCS 7088)
+              </AppText>
+              <TextInput
+                style={styles.input}
+                value={catno}
+                onChangeText={setCatno}
+                placeholder="Enter catno"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                onSubmitEditing={searchCatno}
+              />
+            </>
+          )}
           <Button title="Search Discogs" onPress={searchCatno} loading={loading} />
         </View>
       ) : null}
 
       {mode === 'cover' ? (
         <View style={styles.form}>
-          <AppText variant="caption">
-            Photograph the front with artist and title in frame. Back or spine
-            works when the front has no text.
-          </AppText>
+          {compactResults ? null : (
+            <AppText variant="caption">
+              Photograph the front with artist and title in frame. Back or spine
+              works when the front has no text.
+            </AppText>
+          )}
           <View style={styles.coverActions}>
             <Button
               title="Take photo"
@@ -535,20 +563,43 @@ export function ScannerScreen({ navigation }: Props) {
               style={styles.flexBtn}
             />
           </View>
-          {coverUri ? (
-            <Image source={{ uri: coverUri }} style={styles.coverPreview} contentFit="cover" />
-          ) : null}
-          <AppText variant="caption" style={styles.fieldLabel}>
-            Search text (from OCR or typed)
-          </AppText>
-          <TextInput
-            style={[styles.input, styles.inputMulti]}
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Artist and album title"
-            placeholderTextColor={colors.textMuted}
-            multiline
-          />
+          {compactResults && coverUri ? (
+            <View style={styles.compactRow}>
+              <Image
+                source={{ uri: coverUri }}
+                style={styles.coverPreviewCompact}
+                contentFit="cover"
+              />
+              <TextInput
+                style={[styles.input, styles.inputFlex]}
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Artist and album title"
+                placeholderTextColor={colors.textMuted}
+              />
+            </View>
+          ) : (
+            <>
+              {coverUri ? (
+                <Image
+                  source={{ uri: coverUri }}
+                  style={styles.coverPreview}
+                  contentFit="cover"
+                />
+              ) : null}
+              <AppText variant="caption" style={styles.fieldLabel}>
+                Search text (from OCR or typed)
+              </AppText>
+              <TextInput
+                style={[styles.input, styles.inputMulti]}
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Artist and album title"
+                placeholderTextColor={colors.textMuted}
+                multiline
+              />
+            </>
+          )}
           <Button
             title="Search Discogs"
             onPress={searchCoverQuery}
@@ -575,8 +626,10 @@ export function ScannerScreen({ navigation }: Props) {
 
       <FlatList
         data={results}
+        style={styles.listFlex}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={styles.list}
+        keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           results.length > 0 ? (
             <AppText variant="label" style={styles.resultsLabel}>
@@ -675,7 +728,7 @@ const styles = StyleSheet.create({
   form: {
     paddingHorizontal: spacing.lg,
     gap: spacing.sm,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   input: {
     backgroundColor: colors.surface,
@@ -685,11 +738,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   inputMulti: { minHeight: 72, textAlignVertical: 'top' },
+  inputFlex: { flex: 1 },
   coverActions: { flexDirection: 'row', gap: spacing.sm },
   flexBtn: { flex: 1 },
+  compactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   coverPreview: {
     width: '100%',
     height: 160,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surface,
+  },
+  coverPreviewCompact: {
+    width: 56,
+    height: 56,
     borderRadius: radius.sm,
     backgroundColor: colors.surface,
   },
@@ -704,7 +769,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.sm,
   },
-  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
+  listFlex: { flex: 1 },
+  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl, flexGrow: 1 },
   resultsLabel: { marginBottom: spacing.sm },
   row: {
     flexDirection: 'row',

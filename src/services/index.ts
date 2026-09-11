@@ -8,6 +8,7 @@ export {
   fetchMarketplaceStats,
   attachPricesToRows,
   searchDatabase,
+  addReleaseToDiscogsCollection,
   isDiscogsRateLimitError,
   discogsUserError,
   type DiscogsIdentity,
@@ -95,6 +96,13 @@ export {
 } from './genreOverrides';
 
 export { useCachedThumb, getCachedThumbUri } from './thumbnailCache';
+
+export {
+  addReleaseToUserCollection,
+  isInUserCollection,
+  isSameRelease,
+  categoriesFromFormatStr,
+} from './addToCollection';
 
 export {
   getLastCollectionCount,

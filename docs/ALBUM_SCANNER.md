@@ -34,4 +34,4 @@ Uses `@react-native-ml-kit/text-recognition` when present in the native binary. 
 
 - No Discogs “match this photo” API — cover ID is OCR + text search (plus optional barcode in the photo), not visual embedding match.
 - Local/import-only accounts cannot search (need Discogs PAT or OAuth).
-- Adding a scanned release **to** your Discogs collection is not implemented yet (identify only).
+- Adding a scanned release to your collection: **Add to Collection** on album detail. Local/offline accounts save in the app; Discogs-connected accounts also POST to Uncategorized (folder 1).
