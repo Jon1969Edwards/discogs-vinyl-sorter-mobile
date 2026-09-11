@@ -520,6 +520,9 @@ export type DiscogsSearchParams = {
   barcode?: string;
   catno?: string;
   query?: string;
+  format?: string;
+  artist?: string;
+  releaseTitle?: string;
   type?: 'release' | 'master' | 'artist' | 'label';
   perPage?: number;
   page?: number;
@@ -537,8 +540,11 @@ export async function searchDatabase(
   if (params.barcode?.trim()) q.barcode = params.barcode.trim();
   if (params.catno?.trim()) q.catno = params.catno.trim();
   if (params.query?.trim()) q.q = params.query.trim();
+  if (params.format?.trim()) q.format = params.format.trim();
+  if (params.artist?.trim()) q.artist = params.artist.trim();
+  if (params.releaseTitle?.trim()) q.release_title = params.releaseTitle.trim();
 
-  if (!q.barcode && !q.catno && !q.q) {
+  if (!q.barcode && !q.catno && !q.q && !q.artist && !q.release_title) {
     return [];
   }
 

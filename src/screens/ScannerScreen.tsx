@@ -14,7 +14,12 @@ import {
   Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
+import {
+  CameraView,
+  useCameraPermissions,
+  scanFromURLAsync,
+  type BarcodeScanningResult,
+} from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,18 +30,84 @@ import {
   getStoredCredentials,
   searchDatabase,
 } from '../services';
-import { extractTextFromImage, isOcrAvailable } from '../services/coverOcr';
+import { prepareCoverForOcr } from '../services/coverImage';
+import { extractTextFromImages, isOcrAvailable } from '../services/coverOcr';
 import {
-  extractLikelyCatno,
+  catnoSearchAttempts,
+  coverSearchAttempts,
+  dedupeSearchResults,
+  extractCatnoFromOcr,
+  extractCoverQuery,
+  extractLikelyYear,
   normalizeBarcode,
-  queryFromOcrText,
+  rankSearchResults,
   searchResultToReleaseRow,
+  type CoverQuery,
+  type CoverSearchParams,
 } from '../utils/discogsSearch';
 import { AppText } from '../components/ui/AppText';
 import { Button } from '../components/ui/Button';
 import { colors, radius, spacing } from '../theme';
 
 type ScanMode = 'barcode' | 'catno' | 'cover';
+
+const PHOTO_PICKER_OPTS: ImagePicker.ImagePickerOptions = {
+  quality: 1,
+  allowsEditing: true,
+};
+
+type PickedPhoto = { uri: string; width?: number; height?: number };
+
+type CameraPermission = {
+  granted?: boolean;
+};
+
+async function pickScanPhoto(
+  source: 'camera' | 'gallery',
+  permission: CameraPermission | null,
+  requestPermission: () => Promise<CameraPermission>
+): Promise<PickedPhoto | null> {
+  if (source === 'camera') {
+    if (!permission?.granted) {
+      const res = await requestPermission();
+      if (!res.granted) {
+        Alert.alert(
+          'Camera permission needed',
+          'Enable camera to photograph catalog numbers and covers.'
+        );
+        return null;
+      }
+    }
+    const shot = await ImagePicker.launchCameraAsync(PHOTO_PICKER_OPTS);
+    if (shot.canceled || !shot.assets?.[0]?.uri) return null;
+    const asset = shot.assets[0];
+    return { uri: asset.uri, width: asset.width, height: asset.height };
+  }
+  const shot = await ImagePicker.launchImageLibraryAsync(PHOTO_PICKER_OPTS);
+  if (shot.canceled || !shot.assets?.[0]?.uri) return null;
+  const asset = shot.assets[0];
+  return { uri: asset.uri, width: asset.width, height: asset.height };
+}
+
+async function barcodeFromPhoto(uri: string): Promise<string | null> {
+  try {
+    const found = await scanFromURLAsync(uri, [
+      'ean13',
+      'ean8',
+      'upc_a',
+      'upc_e',
+      'code128',
+      'code39',
+    ]);
+    for (const hit of found || []) {
+      const code = normalizeBarcode(hit.data);
+      if (code.length >= 8) return code;
+    }
+  } catch {
+    // iOS still-image scan is QR-only; Android wants a large code in frame.
+  }
+  return null;
+}
 
 type Props = {
   navigation: {
@@ -51,6 +122,7 @@ export function ScannerScreen({ navigation }: Props) {
   const [catno, setCatno] = useState('');
   const [query, setQuery] = useState('');
   const [coverUri, setCoverUri] = useState<string | null>(null);
+  const [catnoUri, setCatnoUri] = useState<string | null>(null);
   const [results, setResults] = useState<DiscogsSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,24 +138,54 @@ export function ScannerScreen({ navigation }: Props) {
     scanLock.current = false;
   }, [mode]);
 
+  const runSearchAttempts = useCallback(
+    async (
+      attempts: CoverSearchParams[],
+      cover: CoverQuery,
+      extra?: { barcodeMatchedHint?: string }
+    ) => {
+      setError(null);
+      const cred = await getStoredCredentials();
+      if (!cred || cred.type === 'local') {
+        setError('Discogs sign-in required to search the database.');
+        setResults([]);
+        return;
+      }
+      const client = createDiscogsClient(cred);
+      let hits: DiscogsSearchResult[] = [];
+      let used: CoverSearchParams | null = null;
+      for (const attempt of attempts) {
+        hits = await searchDatabase(client, attempt);
+        if (hits.length) {
+          used = attempt;
+          break;
+        }
+      }
+      const ranked = rankSearchResults(dedupeSearchResults(hits), cover);
+      setResults(ranked);
+      if (ranked.length === 0) {
+        setHint('No Discogs matches. Try another scan or refine the text.');
+      } else if (used?.barcode) {
+        setHint(extra?.barcodeMatchedHint ?? 'Matched barcode.');
+      } else if (used?.catno) {
+        setHint(`Matched catalog number ${used.catno}.`);
+      } else {
+        setHint(null);
+      }
+    },
+    []
+  );
+
   const runSearch = useCallback(
-    async (params: { barcode?: string; catno?: string; query?: string }) => {
+    async (params: CoverSearchParams) => {
       setLoading(true);
       setError(null);
       setHint(null);
       try {
-        const cred = await getStoredCredentials();
-        if (!cred || cred.type === 'local') {
-          setError('Discogs sign-in required to search the database.');
-          setResults([]);
-          return;
-        }
-        const client = createDiscogsClient(cred);
-        const hits = await searchDatabase(client, params);
-        setResults(hits);
-        if (hits.length === 0) {
-          setHint('No Discogs matches. Try another scan or refine the text.');
-        }
+        await runSearchAttempts(
+          [params],
+          extractCoverQuery(params.query || params.catno || '')
+        );
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Search failed');
         setResults([]);
@@ -91,7 +193,7 @@ export function ScannerScreen({ navigation }: Props) {
         setLoading(false);
       }
     },
-    []
+    [runSearchAttempts]
   );
 
   const onBarcodeScanned = useCallback(
@@ -117,90 +219,156 @@ export function ScannerScreen({ navigation }: Props) {
       setError('Enter a catalog number');
       return;
     }
-    void runSearch({ catno: value });
-  }, [catno, runSearch]);
+    setLoading(true);
+    setHint(null);
+    void runSearchAttempts(catnoSearchAttempts({ catno: value }), {
+      query: '',
+      shortQuery: '',
+      catno: value,
+      year: null,
+    })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : 'Search failed');
+        setResults([]);
+      })
+      .finally(() => setLoading(false));
+  }, [catno, runSearchAttempts]);
 
   const searchCoverQuery = useCallback(() => {
-    const q = query.trim();
-    const maybeCat = extractLikelyCatno(q);
-    if (maybeCat && q.length < 20) {
-      void runSearch({ catno: maybeCat });
-      return;
-    }
-    if (!q) {
+    const cover = extractCoverQuery(query);
+    if (!cover.query && !cover.catno) {
       setError('Enter artist / title text from the cover');
       return;
     }
-    void runSearch({ query: q });
-  }, [query, runSearch]);
-
-  const takeCoverPhoto = useCallback(async () => {
-    if (!permission?.granted) {
-      const res = await requestPermission();
-      if (!res.granted) {
-        Alert.alert('Camera permission needed', 'Enable camera to photograph covers.');
-        return;
-      }
-    }
-    const shot = await ImagePicker.launchCameraAsync({
-      quality: 0.8,
-      allowsEditing: true,
-      aspect: [1, 1],
-    });
-    if (shot.canceled || !shot.assets?.[0]?.uri) return;
-    const uri = shot.assets[0].uri;
-    setCoverUri(uri);
     setLoading(true);
-    setError(null);
-    try {
-      const text = await extractTextFromImage(uri);
-      if (text) {
-        const q = queryFromOcrText(text);
-        const cat = extractLikelyCatno(text);
-        setQuery(q);
-        setHint(
-          cat
-            ? `OCR found text. Possible catno: ${cat}. Edit and search.`
-            : 'OCR extracted cover text. Edit if needed, then search.'
-        );
-        if (cat && (!q || q.length < 8)) {
-          setCatno(cat);
+    setHint(null);
+    void runSearchAttempts(coverSearchAttempts({ cover }), cover)
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : 'Search failed');
+        setResults([]);
+      })
+      .finally(() => setLoading(false));
+  }, [query, runSearchAttempts]);
+
+  const processCoverUri = useCallback(
+    async (uri: string, width?: number, height?: number) => {
+      setCoverUri(uri);
+      setLoading(true);
+      setError(null);
+      setResults([]);
+      try {
+        const barcode = await barcodeFromPhoto(uri);
+        const ocrUris = await prepareCoverForOcr(uri, width, height);
+        const ocr = await extractTextFromImages(ocrUris);
+        const cover = extractCoverQuery(ocr);
+        setQuery(cover.query);
+        if (cover.catno && (!cover.query || cover.query.length < 8)) {
+          setCatno(cover.catno);
         }
-      } else {
-        setHint(
-          isOcrAvailable()
-            ? 'No text found on image. Type artist / title, then search.'
-            : 'On-device OCR not in this build yet. Type artist / title from the cover, then search. (Barcode mode still works live.)'
-        );
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [permission?.granted, requestPermission]);
 
-  const pickCoverPhoto = useCallback(async () => {
-    const shot = await ImagePicker.launchImageLibraryAsync({
-      quality: 0.8,
-      allowsEditing: true,
-      aspect: [1, 1],
-    });
-    if (shot.canceled || !shot.assets?.[0]?.uri) return;
-    const uri = shot.assets[0].uri;
-    setCoverUri(uri);
-    setLoading(true);
-    setError(null);
-    try {
-      const text = await extractTextFromImage(uri);
-      if (text) {
-        setQuery(queryFromOcrText(text));
-        setHint('OCR extracted cover text. Edit if needed, then search.');
-      } else {
-        setHint('Type artist / title from the cover, then search Discogs.');
+        if (!barcode && !cover.query && !cover.catno) {
+          setHint(
+            isOcrAvailable()
+              ? 'No text found on image. Type artist / title, then search.'
+              : 'On-device OCR not in this build yet. Type artist / title from the cover, then search. (Barcode mode still works live.)'
+          );
+          return;
+        }
+
+        const via = barcode
+          ? 'barcode'
+          : cover.catno
+            ? `catno ${cover.catno}`
+            : 'cover text';
+        setHint(`Searching Discogs (${via})…`);
+        await runSearchAttempts(
+          coverSearchAttempts({ barcode, cover }),
+          cover
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Search failed');
+        setResults([]);
+      } finally {
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    [runSearchAttempts]
+  );
+
+  const processCatnoUri = useCallback(
+    async (uri: string, width?: number, height?: number) => {
+      setCatnoUri(uri);
+      setLoading(true);
+      setError(null);
+      setResults([]);
+      try {
+        const barcode = await barcodeFromPhoto(uri);
+        const ocrUris = await prepareCoverForOcr(uri, width, height);
+        const ocr = await extractTextFromImages(ocrUris);
+        const found = extractCatnoFromOcr(ocr);
+        setCatno(found ?? '');
+
+        if (!found && !barcode) {
+          setHint(
+            isOcrAvailable()
+              ? 'No catalog number found. Crop closer to the number, or type it.'
+              : 'On-device OCR not in this build yet. Type the catalog number, then search.'
+          );
+          return;
+        }
+
+        if (found) {
+          setHint(`Searching Discogs (catno ${found})…`);
+          await runSearchAttempts(catnoSearchAttempts({ catno: found }), {
+            query: '',
+            shortQuery: '',
+            catno: found,
+            year: extractLikelyYear(ocr.text),
+          });
+          return;
+        }
+
+        setHint('No catno found; searched barcode instead.');
+        await runSearchAttempts(
+          catnoSearchAttempts({ barcode }),
+          { query: '', shortQuery: '', catno: null, year: null },
+          { barcodeMatchedHint: 'No catno found; searched barcode instead.' }
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Search failed');
+        setResults([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [runSearchAttempts]
+  );
+
+  const takeScanPhoto = useCallback(
+    async (target: 'catno' | 'cover') => {
+      const photo = await pickScanPhoto('camera', permission, requestPermission);
+      if (!photo) return;
+      if (target === 'catno') {
+        await processCatnoUri(photo.uri, photo.width, photo.height);
+      } else {
+        await processCoverUri(photo.uri, photo.width, photo.height);
+      }
+    },
+    [permission, requestPermission, processCatnoUri, processCoverUri]
+  );
+
+  const pickScanGallery = useCallback(
+    async (target: 'catno' | 'cover') => {
+      const photo = await pickScanPhoto('gallery', permission, requestPermission);
+      if (!photo) return;
+      if (target === 'catno') {
+        await processCatnoUri(photo.uri, photo.width, photo.height);
+      } else {
+        await processCoverUri(photo.uri, photo.width, photo.height);
+      }
+    },
+    [permission, requestPermission, processCatnoUri, processCoverUri]
+  );
 
   const openResult = useCallback(
     (hit: DiscogsSearchResult) => {
@@ -295,7 +463,32 @@ export function ScannerScreen({ navigation }: Props) {
 
       {mode === 'catno' ? (
         <View style={styles.form}>
-          <AppText variant="caption">Catalog number (e.g. PCS 7088)</AppText>
+          <AppText variant="caption">
+            Photograph the catalog number on the label, spine, or sleeve.
+          </AppText>
+          <View style={styles.coverActions}>
+            <Button
+              title="Take photo"
+              onPress={() => void takeScanPhoto('catno')}
+              style={styles.flexBtn}
+            />
+            <Button
+              title="Gallery"
+              variant="secondary"
+              onPress={() => void pickScanGallery('catno')}
+              style={styles.flexBtn}
+            />
+          </View>
+          {catnoUri ? (
+            <Image
+              source={{ uri: catnoUri }}
+              style={styles.coverPreview}
+              contentFit="cover"
+            />
+          ) : null}
+          <AppText variant="caption" style={styles.fieldLabel}>
+            Catalog number (e.g. PCS 7088)
+          </AppText>
           <TextInput
             style={styles.input}
             value={catno}
@@ -312,16 +505,20 @@ export function ScannerScreen({ navigation }: Props) {
 
       {mode === 'cover' ? (
         <View style={styles.form}>
+          <AppText variant="caption">
+            Photograph the front with artist and title in frame. Back or spine
+            works when the front has no text.
+          </AppText>
           <View style={styles.coverActions}>
             <Button
               title="Take photo"
-              onPress={() => void takeCoverPhoto()}
+              onPress={() => void takeScanPhoto('cover')}
               style={styles.flexBtn}
             />
             <Button
               title="Gallery"
               variant="secondary"
-              onPress={() => void pickCoverPhoto()}
+              onPress={() => void pickScanGallery('cover')}
               style={styles.flexBtn}
             />
           </View>
@@ -347,7 +544,8 @@ export function ScannerScreen({ navigation }: Props) {
         </View>
       ) : null}
 
-      {loading && mode === 'barcode' ? (
+      {loading &&
+      (mode === 'barcode' || mode === 'cover' || mode === 'catno') ? (
         <ActivityIndicator color={colors.accent} style={styles.inlineSpinner} />
       ) : null}
 
