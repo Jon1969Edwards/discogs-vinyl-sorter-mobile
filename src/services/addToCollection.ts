@@ -15,6 +15,11 @@ import {
 } from './discogsApi';
 import { getStoredCredentials } from './auth';
 import {
+  getCacheUsername,
+  loadCachedRows,
+  saveCachedRows,
+} from './collectionCache';
+import {
   loadLocalCollection,
   notifyLocalCollectionChanged,
   saveLocalCollection,

@@ -186,20 +186,46 @@ export function createDiscogsClient(
 // Retry helper
 // ---------------------------------------------------------------------------
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Don't fire the next Discogs call until this timestamp (ms). */
+let discogsNextOkAt = 0;
+
+function scheduleDiscogsPause(ms: number) {
+  discogsNextOkAt = Math.max(discogsNextOkAt, Date.now() + ms);
+}
+
+async function waitDiscogsGate(): Promise<void> {
+  const wait = discogsNextOkAt - Date.now();
+  if (wait > 0) await sleep(wait);
+}
+
+function observeDiscogsHeaders(response: AxiosResponse | undefined) {
+  if (!response?.headers) return;
+  const remaining = parseInt(
+    String(response.headers['x-discogs-ratelimit-remaining'] ?? ''),
+    10
+  );
+  if (!Number.isNaN(remaining) && remaining <= 2) {
+    scheduleDiscogsPause(4000);
+  }
+}
+
 function shouldRetry(status: number): boolean {
   return status === 429 || (status >= 500 && status < 600);
 }
 
 function getRetryDelay(response: AxiosResponse | undefined, attempt: number): number {
-  const backoff = 1.0;
   if (response?.headers['retry-after']) {
     const val = parseFloat(response.headers['retry-after']);
-    if (!Number.isNaN(val)) return val * 1000; // convert to ms
+    if (!Number.isNaN(val)) return Math.min(Math.max(val * 1000, 3000), 60000);
   }
-  return Math.min(backoff * Math.pow(2, attempt) * 1000, 10000);
+  const status = response?.status;
+  if (status === 429) {
+    return Math.min(5000 * Math.pow(2, attempt), 30000);
+  }
+  return Math.min(1000 * Math.pow(2, attempt), 10000);
 }
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function isDiscogsRateLimitError(err: unknown): boolean {
   const ax = err as { response?: { status?: number }; message?: string };
@@ -209,7 +235,7 @@ export function isDiscogsRateLimitError(err: unknown): boolean {
 
 export function discogsUserError(err: unknown): string {
   if (isDiscogsRateLimitError(err)) {
-    return 'Discogs is rate-limiting. Wait a few seconds, then search again.';
+    return 'Discogs is temporarily limiting requests.';
   }
   return err instanceof Error ? err.message : 'Search failed';
 }
@@ -222,22 +248,25 @@ export async function apiGet<T>(
   client: AxiosInstance,
   url: string,
   params?: Record<string, string>,
-  retries = 3
+  retries = 5
 ): Promise<T> {
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < retries; attempt++) {
+    await waitDiscogsGate();
     try {
       const response = await client.get<T>(url, { params });
+      observeDiscogsHeaders(response);
       return response.data;
     } catch (err: unknown) {
       lastError = err instanceof Error ? err : new Error(String(err));
       const axErr = err as { response?: AxiosResponse; isAxiosError?: boolean };
 
-      if (axErr?.isAxiosError && axErr.response) {
+      if (axErr?.response) {
         const status = axErr.response.status;
         if (shouldRetry(status) && attempt < retries - 1) {
           const delay = getRetryDelay(axErr.response, attempt);
+          if (status === 429) scheduleDiscogsPause(delay);
           await sleep(delay);
           continue;
         }
@@ -261,22 +290,25 @@ export async function apiPost(
   client: AxiosInstance,
   url: string,
   params?: Record<string, string>,
-  retries = 3
+  retries = 5
 ): Promise<void> {
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < retries; attempt++) {
+    await waitDiscogsGate();
     try {
-      await client.post(url, undefined, { params });
+      const response = await client.post(url, undefined, { params });
+      observeDiscogsHeaders(response);
       return;
     } catch (err: unknown) {
       lastError = err instanceof Error ? err : new Error(String(err));
       const axErr = err as { response?: AxiosResponse; isAxiosError?: boolean };
 
-      if (axErr?.isAxiosError && axErr.response) {
+      if (axErr?.response) {
         const status = axErr.response.status;
         if (shouldRetry(status) && attempt < retries - 1) {
           const delay = getRetryDelay(axErr.response, attempt);
+          if (status === 429) scheduleDiscogsPause(delay);
           await sleep(delay);
           continue;
         }

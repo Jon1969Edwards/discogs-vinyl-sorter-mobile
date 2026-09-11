@@ -29,6 +29,7 @@ import {
   createDiscogsClient,
   discogsUserError,
   getStoredCredentials,
+  isDiscogsRateLimitError,
   searchDatabase,
 } from '../services';
 import { prepareCoverForOcr } from '../services/coverImage';
@@ -61,6 +62,20 @@ const CATNO_CAMERA_OPTS: ImagePicker.ImagePickerOptions = {
   quality: 1,
   allowsEditing: false,
 };
+
+function applyScanFailure(
+  err: unknown,
+  setError: (msg: string | null) => void,
+  setHint: (msg: string | null) => void
+) {
+  if (isDiscogsRateLimitError(err)) {
+    setError(null);
+    setHint('Discogs was busy. Tap Search Discogs to try again.');
+    return;
+  }
+  setHint(null);
+  setError(discogsUserError(err));
+}
 
 type PickedPhoto = { uri: string; width?: number; height?: number };
 
@@ -194,7 +209,7 @@ export function ScannerScreen({ navigation }: Props) {
           extractCoverQuery(params.query || params.catno || '')
         );
       } catch (err) {
-        setError(discogsUserError(err));
+        applyScanFailure(err, setError, setHint);
         setResults([]);
       } finally {
         setLoading(false);
@@ -221,13 +236,14 @@ export function ScannerScreen({ navigation }: Props) {
   );
 
   const searchCatno = useCallback(() => {
+    if (loading) return;
     const value = catno.trim();
     if (!value) {
       setError('Enter a catalog number');
       return;
     }
     setLoading(true);
-    setHint(null);
+    setHint('Searching Discogs…');
     void runSearchAttempts(catnoSearchAttempts({ catno: value }), {
       query: '',
       shortQuery: '',
@@ -235,27 +251,28 @@ export function ScannerScreen({ navigation }: Props) {
       year: null,
     })
       .catch((err: unknown) => {
-        setError(discogsUserError(err));
+        applyScanFailure(err, setError, setHint);
         setResults([]);
       })
       .finally(() => setLoading(false));
-  }, [catno, runSearchAttempts]);
+  }, [catno, loading, runSearchAttempts]);
 
   const searchCoverQuery = useCallback(() => {
+    if (loading) return;
     const cover = extractCoverQuery(query);
     if (!cover.query && !cover.catno) {
       setError('Enter artist / title text from the cover');
       return;
     }
     setLoading(true);
-    setHint(null);
+    setHint('Searching Discogs…');
     void runSearchAttempts(coverSearchAttempts({ cover }), cover)
       .catch((err: unknown) => {
-        setError(discogsUserError(err));
+        applyScanFailure(err, setError, setHint);
         setResults([]);
       })
       .finally(() => setLoading(false));
-  }, [query, runSearchAttempts]);
+  }, [query, loading, runSearchAttempts]);
 
   const processCoverUri = useCallback(
     async (uri: string, width?: number, height?: number) => {
@@ -293,7 +310,7 @@ export function ScannerScreen({ navigation }: Props) {
           cover
         );
       } catch (err) {
-        setError(discogsUserError(err));
+        applyScanFailure(err, setError, setHint);
         setResults([]);
       } finally {
         setLoading(false);
@@ -342,7 +359,7 @@ export function ScannerScreen({ navigation }: Props) {
           { barcodeMatchedHint: 'No catno found; searched barcode instead.' }
         );
       } catch (err) {
-        setError(discogsUserError(err));
+        applyScanFailure(err, setError, setHint);
         setResults([]);
       } finally {
         setLoading(false);
@@ -353,6 +370,7 @@ export function ScannerScreen({ navigation }: Props) {
 
   const takeScanPhoto = useCallback(
     async (target: 'catno' | 'cover') => {
+      if (loading) return;
       const photo = await pickScanPhoto(
         'camera',
         permission,
@@ -366,11 +384,12 @@ export function ScannerScreen({ navigation }: Props) {
         await processCoverUri(photo.uri, photo.width, photo.height);
       }
     },
-    [permission, requestPermission, processCatnoUri, processCoverUri]
+    [permission, requestPermission, processCatnoUri, processCoverUri, loading]
   );
 
   const pickScanGallery = useCallback(
     async (target: 'catno' | 'cover') => {
+      if (loading) return;
       const photo = await pickScanPhoto('gallery', permission, requestPermission);
       if (!photo) return;
       if (target === 'catno') {
@@ -379,7 +398,7 @@ export function ScannerScreen({ navigation }: Props) {
         await processCoverUri(photo.uri, photo.width, photo.height);
       }
     },
-    [permission, requestPermission, processCatnoUri, processCoverUri]
+    [permission, requestPermission, processCatnoUri, processCoverUri, loading]
   );
 
   const openResult = useCallback(
@@ -487,12 +506,14 @@ export function ScannerScreen({ navigation }: Props) {
             <Button
               title="Take photo"
               onPress={() => void takeScanPhoto('catno')}
+              disabled={loading}
               style={styles.flexBtn}
             />
             <Button
               title="Gallery"
               variant="secondary"
               onPress={() => void pickScanGallery('catno')}
+              disabled={loading}
               style={styles.flexBtn}
             />
           </View>
@@ -554,12 +575,14 @@ export function ScannerScreen({ navigation }: Props) {
             <Button
               title="Take photo"
               onPress={() => void takeScanPhoto('cover')}
+              disabled={loading}
               style={styles.flexBtn}
             />
             <Button
               title="Gallery"
               variant="secondary"
               onPress={() => void pickScanGallery('cover')}
+              disabled={loading}
               style={styles.flexBtn}
             />
           </View>

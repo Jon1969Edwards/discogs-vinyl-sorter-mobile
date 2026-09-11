@@ -8,7 +8,7 @@ Identify releases via Discogs database search — similar in spirit to Record Sc
 |------|--------|-------------|
 | **Barcode** | Live camera (`expo-camera`) | `GET /database/search?barcode=` |
 | **Cat No** | Typed catalog number, or photo (camera/gallery) → OCR | `?catno=` with spaced variants (`COOKCD302` → `COOK CD 302`); barcode only if OCR finds no catno |
-| **Cover** | Photo (camera/gallery) → OCR → auto search | barcode (if found), then `?catno=` + `format=Vinyl`, then `?q=` + Vinyl, then fallbacks |
+| **Cover** | Photo (camera/gallery) → OCR → auto search | barcode (if found), then one `?catno=` variant, then `?q=`, then a shorter query if needed |
 
 Results open **Album detail** (same stack screen as collection rows).
 
@@ -22,7 +22,7 @@ Same capture/OCR stack as Cover (full quality, resize, ML Kit). **Take photo** s
 2. Resize the long side to ~1600px (`expo-image-manipulator`) and OCR **original + resized** with ML Kit, merging unique lines.
 3. Still-image barcode scan (`Camera.scanFromURLAsync`) is best-effort: iOS is QR-only; Android wants the code large in the frame.
 4. Score ML Kit lines (frame height, drop sleeve noise like STEREO / SIDE A / LP, keep catno and year separate). Take the best 1–2 artist/title lines.
-5. Search Discogs in order: barcode → catno+Vinyl → catno → query+Vinyl → query → shorter query. Stop at the first non-empty result set.
+5. Search Discogs in order: barcode → one catno variant → query → shorter query. Stop at the first non-empty result set. 429s are retried with backoff (and sequential calls are gated) so the scanner should not ask the user to wait.
 6. Re-rank hits by token overlap with the OCR query, Vinyl/LP format, matching year, and exact catno.
 7. The query field stays editable so the user can correct OCR and search again.
 

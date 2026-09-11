@@ -318,16 +318,18 @@ export function coverSearchAttempts(opts: {
   const code = opts.barcode ? normalizeBarcode(opts.barcode) : '';
   if (code.length >= 8) {
     attempts.push({ barcode: code });
+    return attempts;
   }
   if (opts.cover.catno) {
-    attempts.push({ catno: opts.cover.catno, format: 'Vinyl' });
-    attempts.push({ catno: opts.cover.catno });
+    const variants = catnoQueryVariants(opts.cover.catno);
+    if (variants[0]) attempts.push({ catno: variants[0] });
   }
   if (opts.cover.query) {
-    attempts.push({ query: opts.cover.query, format: 'Vinyl' });
     attempts.push({ query: opts.cover.query });
-    if (opts.cover.shortQuery && opts.cover.shortQuery !== opts.cover.query) {
-      attempts.push({ query: opts.cover.shortQuery, format: 'Vinyl' });
+    if (
+      opts.cover.shortQuery &&
+      opts.cover.shortQuery !== opts.cover.query
+    ) {
       attempts.push({ query: opts.cover.shortQuery });
     }
   }

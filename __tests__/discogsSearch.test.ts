@@ -126,13 +126,14 @@ describe('discogsSearch helpers', () => {
     expect(extractLikelyYear('no year here')).toBeNull();
   });
 
-  it('searches catno before free text, Vinyl first', () => {
+  it('searches catno before free text, without Vinyl pairs', () => {
     const cover = extractCoverQuery('The Beatles\nAbbey Road\nPCS 7088');
     const attempts = coverSearchAttempts({ cover });
-    expect(attempts[0]).toEqual({ catno: cover.catno!, format: 'Vinyl' });
-    expect(attempts[1]).toEqual({ catno: cover.catno! });
-    expect(attempts[2]).toEqual({ query: cover.query, format: 'Vinyl' });
-    expect(attempts.some((a) => a.query === cover.shortQuery)).toBe(true);
+    expect(attempts[0]).toEqual({
+      catno: catnoQueryVariants(cover.catno!)[0],
+    });
+    expect(attempts.some((a) => a.query === cover.query)).toBe(true);
+    expect(attempts.every((a) => !a.format)).toBe(true);
   });
 
   it('tries a still-image barcode before catno/text', () => {
