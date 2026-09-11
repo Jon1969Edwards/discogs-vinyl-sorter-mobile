@@ -27,6 +27,7 @@ import type { ReleaseRow } from '../types';
 import type { DiscogsSearchResult } from '../services/discogsApi';
 import {
   createDiscogsClient,
+  discogsUserError,
   getStoredCredentials,
   searchDatabase,
 } from '../services';
@@ -56,6 +57,11 @@ const PHOTO_PICKER_OPTS: ImagePicker.ImagePickerOptions = {
   allowsEditing: true,
 };
 
+const CATNO_CAMERA_OPTS: ImagePicker.ImagePickerOptions = {
+  quality: 1,
+  allowsEditing: false,
+};
+
 type PickedPhoto = { uri: string; width?: number; height?: number };
 
 type CameraPermission = {
@@ -65,7 +71,8 @@ type CameraPermission = {
 async function pickScanPhoto(
   source: 'camera' | 'gallery',
   permission: CameraPermission | null,
-  requestPermission: () => Promise<CameraPermission>
+  requestPermission: () => Promise<CameraPermission>,
+  pickerOpts: ImagePicker.ImagePickerOptions = PHOTO_PICKER_OPTS
 ): Promise<PickedPhoto | null> {
   if (source === 'camera') {
     if (!permission?.granted) {
@@ -78,12 +85,12 @@ async function pickScanPhoto(
         return null;
       }
     }
-    const shot = await ImagePicker.launchCameraAsync(PHOTO_PICKER_OPTS);
+    const shot = await ImagePicker.launchCameraAsync(pickerOpts);
     if (shot.canceled || !shot.assets?.[0]?.uri) return null;
     const asset = shot.assets[0];
     return { uri: asset.uri, width: asset.width, height: asset.height };
   }
-  const shot = await ImagePicker.launchImageLibraryAsync(PHOTO_PICKER_OPTS);
+  const shot = await ImagePicker.launchImageLibraryAsync(pickerOpts);
   if (shot.canceled || !shot.assets?.[0]?.uri) return null;
   const asset = shot.assets[0];
   return { uri: asset.uri, width: asset.width, height: asset.height };
@@ -187,7 +194,7 @@ export function ScannerScreen({ navigation }: Props) {
           extractCoverQuery(params.query || params.catno || '')
         );
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Search failed');
+        setError(discogsUserError(err));
         setResults([]);
       } finally {
         setLoading(false);
@@ -228,7 +235,7 @@ export function ScannerScreen({ navigation }: Props) {
       year: null,
     })
       .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : 'Search failed');
+        setError(discogsUserError(err));
         setResults([]);
       })
       .finally(() => setLoading(false));
@@ -244,7 +251,7 @@ export function ScannerScreen({ navigation }: Props) {
     setHint(null);
     void runSearchAttempts(coverSearchAttempts({ cover }), cover)
       .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : 'Search failed');
+        setError(discogsUserError(err));
         setResults([]);
       })
       .finally(() => setLoading(false));
@@ -286,7 +293,7 @@ export function ScannerScreen({ navigation }: Props) {
           cover
         );
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Search failed');
+        setError(discogsUserError(err));
         setResults([]);
       } finally {
         setLoading(false);
@@ -311,7 +318,7 @@ export function ScannerScreen({ navigation }: Props) {
         if (!found && !barcode) {
           setHint(
             isOcrAvailable()
-              ? 'No catalog number found. Crop closer to the number, or type it.'
+              ? 'No catalog number found. Hold closer to the number, or type it.'
               : 'On-device OCR not in this build yet. Type the catalog number, then search.'
           );
           return;
@@ -335,7 +342,7 @@ export function ScannerScreen({ navigation }: Props) {
           { barcodeMatchedHint: 'No catno found; searched barcode instead.' }
         );
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Search failed');
+        setError(discogsUserError(err));
         setResults([]);
       } finally {
         setLoading(false);
@@ -346,7 +353,12 @@ export function ScannerScreen({ navigation }: Props) {
 
   const takeScanPhoto = useCallback(
     async (target: 'catno' | 'cover') => {
-      const photo = await pickScanPhoto('camera', permission, requestPermission);
+      const photo = await pickScanPhoto(
+        'camera',
+        permission,
+        requestPermission,
+        target === 'catno' ? CATNO_CAMERA_OPTS : PHOTO_PICKER_OPTS
+      );
       if (!photo) return;
       if (target === 'catno') {
         await processCatnoUri(photo.uri, photo.width, photo.height);
@@ -464,7 +476,8 @@ export function ScannerScreen({ navigation }: Props) {
       {mode === 'catno' ? (
         <View style={styles.form}>
           <AppText variant="caption">
-            Photograph the catalog number on the label, spine, or sleeve.
+            Photograph the catalog number close-up on the label, spine, or
+            sleeve.
           </AppText>
           <View style={styles.coverActions}>
             <Button

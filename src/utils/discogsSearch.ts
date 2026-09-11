@@ -176,15 +176,47 @@ export function extractCatnoFromOcr(
   return best?.token ?? extractLikelyCatno(text);
 }
 
+/**
+ * Discogs catno search strings from OCR/typed input.
+ * COOKCD302 → COOK CD 302 (Cooking Vinyl style) plus the compact form.
+ */
+export function catnoQueryVariants(raw: string): string[] {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return [];
+  const variants: string[] = [];
+  const push = (value: string) => {
+    const t = value.replace(/\s+/g, ' ').trim();
+    if (!t) return;
+    if (!variants.some((x) => x.toUpperCase() === t.toUpperCase())) {
+      variants.push(t);
+    }
+  };
+
+  const compact = trimmed.replace(/[\s-]+/g, '').toUpperCase();
+  const fmt = compact.match(/^([A-Z]+?)(CD|LP|EP|MC)(\d+[A-Z0-9]*)$/i);
+  if (fmt) {
+    push(`${fmt[1]} ${fmt[2]} ${fmt[3]}`);
+    push(`${fmt[1]}${fmt[2]} ${fmt[3]}`);
+  } else {
+    const lettersDigits = compact.match(/^([A-Z]+)(\d+[A-Z0-9]*)$/i);
+    if (lettersDigits) {
+      push(`${lettersDigits[1]} ${lettersDigits[2]}`);
+    }
+  }
+  push(trimmed);
+  push(compact);
+  return variants;
+}
+
 export function catnoSearchAttempts(opts: {
   catno?: string | null;
   barcode?: string | null;
 }): CoverSearchParams[] {
   const attempts: CoverSearchParams[] = [];
   if (opts.catno?.trim()) {
-    const value = opts.catno.trim();
-    attempts.push({ catno: value, format: 'Vinyl' });
-    attempts.push({ catno: value });
+    for (const value of catnoQueryVariants(opts.catno)) {
+      attempts.push({ catno: value });
+    }
     return attempts;
   }
   const code = opts.barcode ? normalizeBarcode(opts.barcode) : '';

@@ -8,6 +8,8 @@ export {
   fetchMarketplaceStats,
   attachPricesToRows,
   searchDatabase,
+  isDiscogsRateLimitError,
+  discogsUserError,
   type DiscogsIdentity,
   type DiscogsCollectionRelease,
   type DiscogsCollectionResponse,

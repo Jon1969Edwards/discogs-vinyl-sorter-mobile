@@ -2,6 +2,7 @@
   "name": "discogs-vinyl-sorter-mobile",
   "version": "1.0.0",
   "main": "index.ts",
+  "private": true,
   "scripts": {
     "start": "expo start --dev-client",
     "start:lan": "expo start --dev-client --lan",
@@ -74,6 +75,5 @@
     "jest-expo": "~54.0.0",
     "react-native-dotenv": "^3.4.0",
     "typescript": "~5.9.2"
-  },
-  "private": true
+  }
 }

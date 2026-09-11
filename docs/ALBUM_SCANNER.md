@@ -7,14 +7,14 @@ Identify releases via Discogs database search — similar in spirit to Record Sc
 | Mode | Input | Discogs API |
 |------|--------|-------------|
 | **Barcode** | Live camera (`expo-camera`) | `GET /database/search?barcode=` |
-| **Cat No** | Typed catalog number, or photo (camera/gallery) → OCR | `?catno=` + `format=Vinyl`, then `?catno=` (barcode only if OCR finds no catno) |
+| **Cat No** | Typed catalog number, or photo (camera/gallery) → OCR | `?catno=` with spaced variants (`COOKCD302` → `COOK CD 302`); barcode only if OCR finds no catno |
 | **Cover** | Photo (camera/gallery) → OCR → auto search | barcode (if found), then `?catno=` + `format=Vinyl`, then `?q=` + Vinyl, then fallbacks |
 
 Results open **Album detail** (same stack screen as collection rows).
 
 ## Cat No photo
 
-Same capture/OCR stack as Cover (full quality, free crop, resize, ML Kit). Extraction scores catalog-number tokens and prefers mixed letter+digit values (`PCS-7088`) over UPC-like digit strings. Auto-search uses `catno` + Vinyl, then plain `catno`. If OCR finds no catno but a barcode is in the photo, search the barcode instead. Artist/title `q=` is not used in this mode.
+Same capture/OCR stack as Cover (full quality, resize, ML Kit). **Take photo** skips the system crop editor so you can snap the number and search. Gallery still offers a crop. Extraction scores catalog-number tokens and prefers mixed letter+digit values (`PCS-7088`) over UPC-like digit strings. Auto-search tries Discogs-friendly spacing (`COOKCD302` → `COOK CD 302`) without a Vinyl-only filter. If OCR finds no catno but a barcode is in the photo, search the barcode instead. Artist/title `q=` is not used in this mode.
 
 ## Cover pipeline
 

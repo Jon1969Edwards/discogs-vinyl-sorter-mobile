@@ -1,5 +1,6 @@
 import {
   catnoSearchAttempts,
+  catnoQueryVariants,
   coverSearchAttempts,
   dedupeSearchResults,
   extractCatnoFromOcr,
@@ -99,14 +100,22 @@ describe('discogsSearch helpers', () => {
     expect(cat).toBe('PCS-7088');
   });
 
-  it('searches catno with Vinyl first, barcode only if catno is missing', () => {
+  it('expands compact catnos like COOKCD302 for Discogs', () => {
+    expect(catnoQueryVariants('COOKCD302')).toEqual([
+      'COOK CD 302',
+      'COOKCD 302',
+      'COOKCD302',
+    ]);
+  });
+
+  it('searches catno variants without a Vinyl filter', () => {
     expect(catnoSearchAttempts({ catno: 'PCS7088' })).toEqual([
-      { catno: 'PCS7088', format: 'Vinyl' },
+      { catno: 'PCS 7088' },
       { catno: 'PCS7088' },
     ]);
     expect(
       catnoSearchAttempts({ catno: 'PCS7088', barcode: '042283923518' })[0]
-    ).toEqual({ catno: 'PCS7088', format: 'Vinyl' });
+    ).toEqual({ catno: 'PCS 7088' });
     expect(catnoSearchAttempts({ barcode: '0 4228-39235-1 8' })).toEqual([
       { barcode: '042283923518' },
     ]);

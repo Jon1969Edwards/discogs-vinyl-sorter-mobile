@@ -201,6 +201,19 @@ function getRetryDelay(response: AxiosResponse | undefined, attempt: number): nu
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+export function isDiscogsRateLimitError(err: unknown): boolean {
+  const ax = err as { response?: { status?: number }; message?: string };
+  const status = ax?.response?.status;
+  return status === 429 || /status code 429/i.test(String(ax?.message || ''));
+}
+
+export function discogsUserError(err: unknown): string {
+  if (isDiscogsRateLimitError(err)) {
+    return 'Discogs is rate-limiting. Wait a few seconds, then search again.';
+  }
+  return err instanceof Error ? err.message : 'Search failed';
+}
+
 // ---------------------------------------------------------------------------
 // Request wrapper with retries
 // ---------------------------------------------------------------------------
