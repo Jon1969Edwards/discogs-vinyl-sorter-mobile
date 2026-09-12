@@ -11,6 +11,7 @@ import {
   DISCOGS_CURRENCY_OPTIONS,
   type DiscogsCurrency,
 } from '../types';
+import { colors } from '../theme';
 
 interface CurrencyPickerProps {
   value: DiscogsCurrency;
@@ -137,7 +138,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 12,
   },
-  optionActive: { backgroundColor: 'rgba(233, 69, 96, 0.15)' },
+  optionActive: { backgroundColor: colors.accentMuted },
   optionCode: {
     color: '#ccc',
     fontSize: 15,

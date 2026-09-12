@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
     minHeight: 88,
     textAlignVertical: 'top',
   },
-  error: { color: colors.accent, marginBottom: spacing.sm },
+  error: { color: colors.error, marginBottom: spacing.sm },
   row: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   flexBtn: { flex: 1 },
   soon: { marginTop: spacing.md, textAlign: 'center' },

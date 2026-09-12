@@ -1,5 +1,6 @@
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { colors } from '../theme';
 
 type Props = { children: ReactNode };
 type State = { error: Error | null };
@@ -40,7 +41,7 @@ const styles = StyleSheet.create({
     paddingTop: 64,
   },
   title: {
-    color: '#e94560',
+    color: colors.error,
     fontSize: 20,
     fontWeight: '700',
     marginBottom: 16,

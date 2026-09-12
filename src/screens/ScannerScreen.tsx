@@ -784,7 +784,7 @@ const styles = StyleSheet.create({
   fieldLabel: { marginTop: spacing.xs },
   inlineSpinner: { marginVertical: spacing.sm },
   error: {
-    color: colors.accent,
+    color: colors.error,
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.sm,
   },

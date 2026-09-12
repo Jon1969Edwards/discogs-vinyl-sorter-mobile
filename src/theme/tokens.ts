@@ -4,15 +4,15 @@ export const colors = {
   background: '#1a1a2e',
   surface: '#252542',
   surfaceElevated: '#2d2d4a',
-  accent: '#e94560',
-  accentMuted: 'rgba(233, 69, 96, 0.15)',
+  accent: '#c9943a',
+  accentMuted: 'rgba(201, 148, 58, 0.18)',
   textPrimary: '#eeeeee',
   textSecondary: '#bbbbbb',
   textMuted: '#666666',
   border: '#3a3a5c',
   warning: '#f0ad4e',
   warningMuted: 'rgba(240, 173, 78, 0.12)',
-  error: '#e94560',
+  error: '#d97a7a',
   white: '#ffffff',
 } as const;
 

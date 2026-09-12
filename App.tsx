@@ -19,6 +19,7 @@ import { LicenseProvider } from './src/context/LicenseContext';
 import { hasStoredCredentials } from './src/services';
 import { subscribeOtaUpdateChecks } from './src/services/appUpdates';
 import { AppErrorBoundary } from './src/components/AppErrorBoundary';
+import { colors } from './src/theme';
 
 const Stack = createNativeStackNavigator();
 
@@ -46,7 +47,7 @@ export default function App() {
   if (hasToken === null) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" color="#e94560" />
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }

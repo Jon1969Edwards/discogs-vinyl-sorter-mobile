@@ -190,7 +190,7 @@ export function CollectionHeader({
                 onSignOut();
               }}
             >
-              <AppText variant="accent" style={styles.menuItemTextDanger}>
+              <AppText variant="body" style={styles.menuItemTextDanger}>
                 Sign out
               </AppText>
             </TouchableOpacity>
@@ -279,6 +279,7 @@ const styles = StyleSheet.create({
   },
   menuItemTextDanger: {
     fontWeight: '600',
+    color: colors.error,
   },
   menuDivider: {
     height: 1,
